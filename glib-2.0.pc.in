@@ -1,0 +1,13 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: GLib WASM
+Description: WASM-native GLib with advanced browser integration
+Version: @PROJECT_VERSION@
+Requires:
+Requires.private:
+Libs: -L${libdir} -lglib-wasm
+Libs.private:
+Cflags: -I${includedir}/glib-2.0

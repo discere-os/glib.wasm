@@ -30,3 +30,45 @@ tags
 
 # Generated Meson cross-compilation files for CI
 vs2019-arm64.txt
+
+# WASM build artifacts
+dist/
+build/
+build-main/
+build-side/
+build-wasm*/
+*.wasm
+*.js.mem
+*.js.symbols
+*.js.temp
+*.wast
+*.wat
+
+# Emscripten cache and tools
+emsdk/
+emsdk_env.sh
+.emscripten_cache/
+
+# Node.js and NPM  
+node_modules/
+package-lock.json
+yarn.lock
+npm-debug.log*
+
+# Testing and CI artifacts
+test-results/
+benchmark-results/
+coverage/
+.nyc_output/
+build-logs/
+
+# Generated JavaScript from TypeScript (only TS sources should be tracked)
+**/*.js
+**/*.js.map
+# Allow legitimate config files
+!eslint.config.js
+!docs/reference/urlmap.js
+
+# Development tools
+.vscode/
+.idea/

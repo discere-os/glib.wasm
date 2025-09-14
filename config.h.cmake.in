@@ -1,0 +1,179 @@
+/* config.h.in for GLib WASM build */
+#ifndef GLIB_WASM_CONFIG_H
+#define GLIB_WASM_CONFIG_H
+
+/* Define if building for WASM */
+#define EMSCRIPTEN 1
+#define GLIB_WASM_BUILD 1
+#define GLIB_STATIC_COMPILATION 1
+#define GLIB_WASM_NATIVE 1
+
+/* Define if we have PCRE2 support */
+#cmakedefine HAVE_PCRE2
+
+/* Define if we have libffi support */
+#cmakedefine HAVE_LIBFFI
+
+/* WASM-native feature flags */
+#cmakedefine ENABLE_SIMD
+#ifdef ENABLE_SIMD
+#define GLIB_WASM_SIMD_ENABLED 1
+#endif
+
+#cmakedefine ENABLE_THREADING
+#ifdef ENABLE_THREADING
+#define G_THREADS_ENABLED 1
+#define GLIB_WASM_THREADING_ENABLED 1
+#endif
+
+#cmakedefine ENABLE_WEBGPU
+#ifdef ENABLE_WEBGPU
+#define GLIB_WASM_WEBGPU_ENABLED 1
+#endif
+
+#cmakedefine ENABLE_OPFS
+#ifdef ENABLE_OPFS
+#define GLIB_WASM_OPFS_ENABLED 1
+#endif
+
+#cmakedefine ENABLE_BROWSER_MAINLOOP
+#ifdef ENABLE_BROWSER_MAINLOOP
+#define GLIB_WASM_BROWSER_MAINLOOP_ENABLED 1
+#endif
+
+#cmakedefine BUILD_SIDE_MODULE
+#ifdef BUILD_SIDE_MODULE
+#define GLIB_WASM_SIDE_MODULE 1
+#endif
+
+/* GLib version info */
+#define GLIB_MAJOR_VERSION @PROJECT_VERSION_MAJOR@
+#define GLIB_MINOR_VERSION @PROJECT_VERSION_MINOR@
+#define GLIB_MICRO_VERSION @PROJECT_VERSION_PATCH@
+
+/* Version age constants for binary compatibility */
+#define GLIB_INTERFACE_AGE 0
+#define GLIB_BINARY_AGE 0
+
+/* Basic feature detection for WASM */
+#define HAVE_STDINT_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_MEMORY_H 1
+#define HAVE_STDLIB_H 1
+#define HAVE_STRING_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_UNISTD_H 1
+
+/* Size definitions for WASM (32-bit) */
+#define SIZEOF_CHAR 1
+#define SIZEOF_SHORT 2
+#define SIZEOF_INT 4
+#define SIZEOF_LONG 4
+#define SIZEOF_LONG_LONG 8
+#define SIZEOF_VOID_P 4
+#define SIZEOF_SIZE_T 4
+
+/* Enable aligned memory allocator stubs for WASM */
+#define HAVE_POSIX_MEMALIGN 1
+
+/* Type alignment definitions */
+#define ALIGNOF_GUINT32 4
+#define ALIGNOF_GUINT64 8
+#define ALIGNOF_UNSIGNED_LONG 4
+
+/* Math functions */
+#define HAVE_CEIL 1
+#define HAVE_FLOOR 1
+#define HAVE_RINT 1
+
+/* String functions */
+#define HAVE_STRCASECMP 1
+#define HAVE_STRNCASECMP 1
+#define HAVE_STRTOK_R 1
+
+/* Memory functions */
+#define HAVE_MEMMOVE 1
+#define HAVE_MEMSET 1
+
+/* Disable problematic features for WASM */
+#undef HAVE_SYS_RESOURCE_H
+#undef HAVE_SYS_TIMES_H
+#undef HAVE_SYS_WAIT_H
+#undef HAVE_LANGINFO_CODESET
+#undef HAVE_LOCALE_H
+#undef HAVE_LC_MESSAGES
+#undef HAVE_BIND_TEXTDOMAIN_CODESET
+#undef HAVE_DCGETTEXT
+#undef HAVE_GETTEXT
+#undef HAVE_LOCALTIME_R
+#undef HAVE_TIMEGM
+#undef HAVE_GMTIME_R
+
+/* Disable NLS to avoid gettext conflicts */
+#undef ENABLE_NLS
+
+/* Threading configuration - WASM with Emscripten pthreads */
+#ifdef G_THREADS_ENABLED
+#define HAVE_PTHREAD_H 1
+#define HAVE_PTHREAD_MUTEX_TRYLOCK 1
+#define HAVE_PTHREAD_MUTEX_TIMEDLOCK 1
+#define HAVE_PTHREAD_COND_TIMEDWAIT 1
+/* Enable pthread condition variable support for WASM */
+#define HAVE_PTHREAD_CONDATTR_SETCLOCK 1
+#define HAVE_CLOCK_MONOTONIC 1
+/* Disable problematic pthread naming functions for WASM */
+#undef HAVE_PTHREAD_GETNAME_NP
+#undef HAVE_PTHREAD_SETNAME_NP_WITHOUT_TID
+#define GLIB_HAVE_PTHREAD_MUTEX_TIMEDLOCK 1
+/* Enable pthread_rwlock for WASM - Emscripten supports it */
+#define GLIB_HAVE_PTHREAD_RWLOCK_TIMEDLOCK 1
+#define THREADS_POSIX 1
+/* Enable WASM-specific threading features */
+#define G_ATOMIC_LOCK_FREE 1
+/* Emscripten pthread features */
+#define __EMSCRIPTEN_PTHREADS__ 1
+#endif
+
+/* File system - limited in WASM */
+#define HAVE_DIRENT_H 1
+#define HAVE_SYS_STAT_H 1
+#undef HAVE_SYS_STATVFS_H
+#undef HAVE_SYS_VFS_H
+#undef HAVE_SYS_MOUNT_H
+#undef HAVE_MNTENT_H
+#undef HAVE_FSTAB_H
+
+/* Network - disabled in WASM */
+#undef HAVE_SYS_SOCKET_H
+#undef HAVE_NETINET_IN_H
+#undef HAVE_ARPA_INET_H
+#undef HAVE_NETDB_H
+
+/* Process management - not available in WASM */
+#undef HAVE_SYS_WAIT_H
+#undef HAVE_PWD_H
+#undef HAVE_GRP_H
+
+/* Define package info */
+#define PACKAGE "glib"
+#define PACKAGE_BUGREPORT "https://gitlab.gnome.org/GNOME/glib/-/issues/"
+#define PACKAGE_NAME "GLib"
+#define PACKAGE_STRING "GLib @PROJECT_VERSION@"
+#define PACKAGE_TARNAME "glib"
+#define PACKAGE_URL "https://wiki.gnome.org/Projects/GLib"
+#define PACKAGE_VERSION "@PROJECT_VERSION@"
+
+/* Define gettext package */
+#define GETTEXT_PACKAGE "glib20"
+
+/* Configure paths for WASM virtual filesystem */
+#define GLIB_LOCALE_DIR "/usr/share/locale"
+#define GLIB_RUNSTATEDIR "/tmp"
+#define G_MODULE_SUFFIX "wasm"
+
+/* Enable all stable features */
+#define GLIB_VERSION_MAX_ALLOWED (G_ENCODE_VERSION(2,86))
+#define GLIB_VERSION_MIN_REQUIRED (G_ENCODE_VERSION(2,44))
+
+#endif /* GLIB_WASM_CONFIG_H */
