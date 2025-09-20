@@ -37,8 +37,9 @@ set(WASM_LINK_FLAGS
     "-s WASM=1"
     "-s MODULARIZE=1"
     "-s EXPORT_ES6=1"
+    "-s EXPORT_NAME=createModule"
     "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPU32','HEAP32','addFunction','removeFunction','getValue','setValue','UTF8ToString','stringToUTF8']"
-    "-s EXPORTED_FUNCTIONS=['_g_main_loop_process_frame','_g_main_loop_process_immediate_sources','_g_main_loop_execute_source','_g_timeout_source_execute','_g_webgpu_set_shared_device']"
+    "-s EXPORTED_FUNCTIONS=['_glib_wasm_init','_glib_wasm_get_version','_glib_wasm_get_build_info','_glib_wasm_test_basic','_glib_wasm_test_filesystem','_glib_wasm_test_simd','_glib_wasm_benchmark_simd','_glib_wasm_cleanup','_malloc','_free']"
     "-s INITIAL_MEMORY=128MB"
     "-s MAXIMUM_MEMORY=1GB"
     "-s ALLOW_MEMORY_GROWTH=1"
@@ -46,6 +47,7 @@ set(WASM_LINK_FLAGS
     "-s ASSERTIONS=0"
     "-s FORCE_FILESYSTEM=1"
     "-s USE_WEBGPU=1"
+    "-s NO_EXIT_RUNTIME=1"
     -lidbfs.js
 )
 
@@ -314,10 +316,18 @@ if(HAVE_LIBFFI)
     )
 endif()
 
+# SIMD sources (when enabled)
+if(ENABLE_SIMD)
+    set(GLIB_SIMD_SOURCES
+        wasm/glib_wasm_simd.c
+    )
+endif()
+
 # Create main library target
 add_library(glib-wasm STATIC
     ${GLIB_CORE_SOURCES}
     ${GOBJECT_SOURCES}
+    ${GLIB_SIMD_SOURCES}
 )
 
 # Link dependencies

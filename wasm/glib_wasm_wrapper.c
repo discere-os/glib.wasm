@@ -24,6 +24,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef GLIB_WASM_SIMD_ENABLED
+// Include SIMD function prototypes
+extern const uint8_t* glib_memchr_simd(const uint8_t* haystack, size_t len, uint8_t needle);
+extern int glib_memcmp_simd(const uint8_t* s1, const uint8_t* s2, size_t len);
+extern size_t glib_strlen_simd(const char* str);
+extern gboolean glib_utf8_validate_simd(const char* str, gssize max_len, const char** end);
+extern void glib_hash_table_bulk_process_simd(uint32_t* values, size_t count, uint32_t adjustment);
+extern gint glib_array_compare_simd(const uint8_t* array1, const uint8_t* array2, size_t element_size, size_t count);
+extern uint32_t glib_simple_checksum_simd(const uint8_t* data, size_t len);
+extern gboolean glib_test_simd_functionality(void);
+extern double glib_benchmark_simd_memcmp(size_t test_size_kb);
+#endif
+
 #ifdef GLIB_WASM_WEBGPU_ENABLED
 #include "../src/webgpu-integration.h"
 #endif
@@ -259,6 +272,98 @@ int glib_wasm_test_filesystem(void) {
 
     g_message("Filesystem tests passed");
     return 1;
+}
+
+/**
+ * Test SIMD functionality and performance
+ */
+EMSCRIPTEN_KEEPALIVE
+int glib_wasm_test_simd(void) {
+#ifdef GLIB_WASM_SIMD_ENABLED
+    if (!glib_initialized) {
+        glib_wasm_init();
+    }
+
+    // Test SIMD functionality
+    if (!glib_test_simd_functionality()) {
+        g_warning("SIMD functionality test failed");
+        return 0;
+    }
+
+    // Test SIMD string operations
+    const char* test_string = "Hello, SIMD world! This is a test string for SIMD operations.";
+    size_t expected_len = strlen(test_string);
+    size_t simd_len = glib_strlen_simd(test_string);
+
+    if (simd_len != expected_len) {
+        g_warning("SIMD strlen test failed: expected %zu, got %zu", expected_len, simd_len);
+        return 0;
+    }
+
+    // Test SIMD memory comparison
+    const char* test_str1 = "identical_string_for_comparison_test";
+    const char* test_str2 = "identical_string_for_comparison_test";
+    const char* test_str3 = "different_string_for_comparison_test";
+
+    int cmp1 = glib_memcmp_simd((const uint8_t*)test_str1, (const uint8_t*)test_str2, strlen(test_str1));
+    int cmp2 = glib_memcmp_simd((const uint8_t*)test_str1, (const uint8_t*)test_str3, strlen(test_str1));
+
+    if (cmp1 != 0) {
+        g_warning("SIMD memcmp test failed: identical strings should compare equal");
+        return 0;
+    }
+
+    if (cmp2 == 0) {
+        g_warning("SIMD memcmp test failed: different strings should not compare equal");
+        return 0;
+    }
+
+    // Test SIMD UTF-8 validation
+    const char* utf8_test = "UTF-8 test: café, naïve, 中文 characters";
+    const char* end_ptr = NULL;
+    gboolean utf8_valid = glib_utf8_validate_simd(utf8_test, -1, &end_ptr);
+
+    if (!utf8_valid) {
+        g_warning("SIMD UTF-8 validation test failed");
+        return 0;
+    }
+
+    // Test SIMD checksum
+    const uint8_t checksum_data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    uint32_t checksum = glib_simple_checksum_simd(checksum_data, sizeof(checksum_data));
+
+    if (checksum == 0) {
+        g_warning("SIMD checksum test failed: checksum should be non-zero");
+        return 0;
+    }
+
+    g_message("All SIMD tests passed successfully");
+    return 1;
+#else
+    g_warning("SIMD support not compiled in");
+    return 0;
+#endif
+}
+
+/**
+ * Benchmark SIMD vs scalar performance
+ */
+EMSCRIPTEN_KEEPALIVE
+double glib_wasm_benchmark_simd(void) {
+#ifdef GLIB_WASM_SIMD_ENABLED
+    if (!glib_initialized) {
+        glib_wasm_init();
+    }
+
+    // Benchmark memcmp performance with 64KB test
+    double throughput = glib_benchmark_simd_memcmp(64);
+
+    g_message("SIMD memcmp throughput: %.2f MB/s", throughput);
+    return throughput;
+#else
+    g_warning("SIMD support not compiled in");
+    return 0.0;
+#endif
 }
 
 /**

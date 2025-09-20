@@ -143,3 +143,53 @@ export interface BrowserCapabilities {
   dynamicLinking: boolean;
   simd: boolean;
 }
+
+// GLib WASM initialization options
+export interface GLibOptions {
+  simdOptimizations?: boolean;
+  webgpuAcceleration?: boolean;
+  maxMemoryMB?: number;
+}
+
+// Test result interfaces
+export interface GLibTestResult {
+  success: boolean;
+  stringOps?: boolean;
+  arrayOps?: boolean;
+  hashOps?: boolean;
+  fileOps?: boolean;
+  dirOps?: boolean;
+  simdOps?: boolean;
+  error?: string;
+}
+
+export interface StringProcessResult {
+  result: string;
+  length: number;
+  isValid: boolean;
+  isValidUTF8: boolean;
+  byteLength: number;
+  error?: string;
+}
+
+export interface ArrayTestResult {
+  success: boolean;
+  count: number;
+  items: string[];
+  error?: string;
+}
+
+export interface HashTestResult {
+  success: boolean;
+  count: number;
+  keys: string[];
+  testLookup: boolean;
+  error?: string;
+}
+
+export interface SListTestResult {
+  success: boolean;
+  count: number;
+  items: number[];
+  error?: string;
+}

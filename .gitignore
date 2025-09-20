@@ -1,3 +1,6 @@
+/install/
+/build-dual-*/
+
 # for all subdirectories
 TAGS
 tags
