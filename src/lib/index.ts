@@ -11,7 +11,18 @@ import type {
   StringProcessResult,
   ArrayTestResult,
   HashTestResult,
-  SListTestResult
+  SListTestResult,
+  GWebCapabilities,
+  WebNativeTestResult,
+  BenchmarkResult,
+  NetworkRequestOptions,
+  NetworkResponse,
+  ThreadOptions,
+  MemoryOptions,
+  GWebNetworkStats,
+  GWebThreadingStats,
+  GWebMemoryStats,
+  GWebStorageStats
 } from './types.ts'
 
 export interface GLibModule {
@@ -24,6 +35,49 @@ export interface GLibModule {
   _glib_wasm_test_simd: () => number
   _glib_wasm_benchmark_simd: () => number  // Returns double as number
   _glib_wasm_cleanup: () => void
+
+  // Web-native capability functions
+  _g_web_get_capabilities: () => number  // Returns pointer to GWebCapabilities
+  _g_web_capabilities_to_json: () => number  // Returns pointer to JSON string
+
+  // Web-native test functions
+  _glib_wasm_test_simd_strings: () => number
+  _glib_wasm_test_crypto: () => number
+  _glib_wasm_test_networking: () => number
+  _glib_wasm_test_web_native: () => number
+
+  // SIMD string operations
+  _g_web_strlen_simd: (str: number) => number
+  _g_web_strcmp_simd: (s1: number, s2: number, max_len: number) => number
+  _g_web_strchr_simd: (str: number, c: number) => number
+  _g_web_utf8_validate_simd: (str: number, len: number) => number
+
+  // Web crypto functions
+  _g_web_random_bytes: (buffer: number, length: number) => number
+  _g_web_checksum_string: (str: number, checksum_type: number) => number  // Returns pointer
+  _g_web_checksum_bytes: (data: number, length: number, checksum_type: number) => number
+
+  // Networking functions
+  _g_web_http_get: (url: number) => number  // Returns pointer to response data
+  _g_web_http_post_json: (url: number, json_data: number) => number
+  _g_web_url_is_reachable: (url: number) => number
+  _g_web_networking_benchmark: (test_url: number) => number  // Returns throughput
+  _g_web_networking_get_stats: (requests: number, downloaded: number, uploaded: number) => void
+
+  // Threading functions
+  _g_web_thread_is_main_thread: () => number
+  _g_web_threading_get_stats: (active: number, total: number, avg_time: number) => void
+  _g_web_threading_benchmark: (thread_count: number) => number
+
+  // Memory management
+  _g_web_malloc_tracked: (size: number, debug_info: number) => number
+  _g_web_free_tracked: (ptr: number) => void
+  _g_web_memory_get_stats: (stats_ptr: number) => void  // Fills GWebMemoryStats
+  _g_web_memory_benchmark: () => number
+
+  // Storage functions
+  _g_web_storage_get_stats: (stats_ptr: number) => void
+  _g_web_storage_benchmark: () => number
 
   // Runtime methods
   ccall: (name: string, returnType: string, argTypes: string[], args: any[]) => any
@@ -377,6 +431,414 @@ export default class GLib {
     }
   }
 
+  // Web-native capability detection
+  async getWebCapabilities(): Promise<GWebCapabilities> {
+    this.ensureInitialized()
+
+    try {
+      const capsPtr = this.module!._g_web_get_capabilities()
+      if (!capsPtr) {
+        throw new Error('Failed to get web capabilities')
+      }
+
+      // Read the capabilities structure from WASM memory
+      const heapu8 = this.module!.HEAPU8
+      return {
+        has_opfs: Boolean(heapu8[capsPtr + 0]),
+        has_shared_array_buffer: Boolean(heapu8[capsPtr + 1]),
+        has_wasm_simd: Boolean(heapu8[capsPtr + 2]),
+        has_web_crypto: Boolean(heapu8[capsPtr + 3]),
+        has_web_workers: Boolean(heapu8[capsPtr + 4]),
+        has_fetch_api: Boolean(heapu8[capsPtr + 5]),
+        has_intl_apis: Boolean(heapu8[capsPtr + 6]),
+        has_request_animation_frame: Boolean(heapu8[capsPtr + 7]),
+        is_deno_runtime: Boolean(heapu8[capsPtr + 8]),
+        is_chrome_based: Boolean(heapu8[capsPtr + 9]),
+        chrome_version: this.module!.getValue(capsPtr + 12, 'i32')
+      }
+    } catch (error) {
+      console.warn('Failed to get web capabilities:', error)
+      return {
+        has_opfs: false,
+        has_shared_array_buffer: false,
+        has_wasm_simd: false,
+        has_web_crypto: false,
+        has_web_workers: false,
+        has_fetch_api: false,
+        has_intl_apis: false,
+        has_request_animation_frame: false,
+        is_deno_runtime: false,
+        is_chrome_based: false,
+        chrome_version: 0
+      }
+    }
+  }
+
+  // Comprehensive web-native testing
+  async testWebNativeFunctionality(): Promise<WebNativeTestResult> {
+    this.ensureInitialized()
+
+    try {
+      const result = this.module!._glib_wasm_test_web_native()
+
+      if (result === 1) {
+        const capabilities = await this.getWebCapabilities()
+        return {
+          success: true,
+          capabilities,
+          simd_performance: await this.benchmarkSIMDStrings(),
+          crypto_performance: await this.benchmarkCrypto(),
+          network_performance: await this.benchmarkNetworking(),
+          threading_performance: await this.benchmarkThreading(),
+          memory_performance: await this.benchmarkMemory(),
+          storage_performance: await this.benchmarkStorage()
+        }
+      }
+
+      return {
+        success: false,
+        error: 'Web-native functionality test failed'
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
+  }
+
+  // SIMD string operations
+  async testSIMDStrings(text: string = "Hello, WASM SIMD World! 🌍"): Promise<BenchmarkResult> {
+    this.ensureInitialized()
+
+    try {
+      const startTime = performance.now()
+      const result = this.module!._glib_wasm_test_simd_strings()
+      const endTime = performance.now()
+
+      return {
+        operation: 'SIMD String Operations',
+        time_ms: endTime - startTime,
+        success: result === 1,
+        operations_per_sec: result === 1 ? Math.round(1000 / (endTime - startTime)) : 0,
+        error: result !== 1 ? 'SIMD string test failed' : undefined
+      }
+    } catch (error) {
+      return {
+        operation: 'SIMD String Operations',
+        time_ms: 0,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
+  }
+
+  async benchmarkSIMDStrings(): Promise<number> {
+    this.ensureInitialized()
+
+    try {
+      // Test data for SIMD string operations
+      const testString = "This is a test string for SIMD benchmark with UTF-8: 🚀✨🌟"
+      const iterations = 10000
+
+      const inputLen = testString.length * 3 + 1
+      const inputPtr = this.module!._malloc(inputLen)
+      this.module!.stringToUTF8(testString, inputPtr, inputLen)
+
+      const startTime = performance.now()
+
+      for (let i = 0; i < iterations; i++) {
+        this.module!._g_web_strlen_simd(inputPtr)
+      }
+
+      const endTime = performance.now()
+      this.module!._free(inputPtr)
+
+      const timeSeconds = (endTime - startTime) / 1000
+      const throughputMBps = (testString.length * iterations) / (1024 * 1024 * timeSeconds)
+
+      return throughputMBps
+    } catch (error) {
+      console.warn('SIMD strings benchmark failed:', error)
+      return 0
+    }
+  }
+
+  // Web Crypto API integration
+  async testCrypto(): Promise<GLibTestResult> {
+    this.ensureInitialized()
+
+    try {
+      const result = this.module!._glib_wasm_test_crypto()
+      return {
+        success: result === 1,
+        cryptoOps: result === 1,
+        error: result !== 1 ? 'Crypto test failed' : undefined
+      }
+    } catch (error) {
+      return {
+        success: false,
+        cryptoOps: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
+  }
+
+  async generateRandomBytes(length: number): Promise<Uint8Array> {
+    this.ensureInitialized()
+
+    const buffer = this.module!._malloc(length)
+    try {
+      const result = this.module!._g_web_random_bytes(buffer, length)
+      if (result === 1) {
+        return new Uint8Array(this.module!.HEAPU8.slice(buffer, buffer + length))
+      }
+      throw new Error('Failed to generate random bytes')
+    } finally {
+      this.module!._free(buffer)
+    }
+  }
+
+  async computeChecksum(data: string | Uint8Array, algorithm: 'SHA256' | 'SHA1' | 'MD5' = 'SHA256'): Promise<string> {
+    this.ensureInitialized()
+
+    const checksumType = algorithm === 'SHA256' ? 1 : algorithm === 'SHA1' ? 2 : 3
+
+    if (typeof data === 'string') {
+      const inputLen = data.length * 3 + 1
+      const inputPtr = this.module!._malloc(inputLen)
+      try {
+        this.module!.stringToUTF8(data, inputPtr, inputLen)
+        const resultPtr = this.module!._g_web_checksum_string(inputPtr, checksumType)
+        if (!resultPtr) throw new Error('Checksum computation failed')
+        return this.module!.UTF8ToString(resultPtr)
+      } finally {
+        this.module!._free(inputPtr)
+      }
+    } else {
+      const dataPtr = this.module!._malloc(data.length)
+      try {
+        this.module!.HEAPU8.set(data, dataPtr)
+        const resultPtr = this.module!._g_web_checksum_bytes(dataPtr, data.length, checksumType)
+        if (!resultPtr) throw new Error('Checksum computation failed')
+        return this.module!.UTF8ToString(resultPtr)
+      } finally {
+        this.module!._free(dataPtr)
+      }
+    }
+  }
+
+  async benchmarkCrypto(): Promise<number> {
+    this.ensureInitialized()
+
+    try {
+      const testData = "Benchmark data for crypto performance testing with various characters: 🔐🛡️⚡"
+      const iterations = 1000
+
+      const startTime = performance.now()
+
+      for (let i = 0; i < iterations; i++) {
+        await this.computeChecksum(testData, 'SHA256')
+      }
+
+      const endTime = performance.now()
+      const timeSeconds = (endTime - startTime) / 1000
+      const throughputMBps = (testData.length * iterations) / (1024 * 1024 * timeSeconds)
+
+      return throughputMBps
+    } catch (error) {
+      console.warn('Crypto benchmark failed:', error)
+      return 0
+    }
+  }
+
+  // Networking functions
+  async testNetworking(): Promise<GLibTestResult> {
+    this.ensureInitialized()
+
+    try {
+      const result = this.module!._glib_wasm_test_networking()
+      return {
+        success: result === 1,
+        networkOps: result === 1,
+        error: result !== 1 ? 'Networking test failed' : undefined
+      }
+    } catch (error) {
+      return {
+        success: false,
+        networkOps: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
+  }
+
+  async httpGet(url: string): Promise<NetworkResponse> {
+    this.ensureInitialized()
+
+    const urlLen = url.length * 3 + 1
+    const urlPtr = this.module!._malloc(urlLen)
+
+    try {
+      this.module!.stringToUTF8(url, urlPtr, urlLen)
+      const responsePtr = this.module!._g_web_http_get(urlPtr)
+
+      if (!responsePtr) {
+        return {
+          status_code: 0,
+          success: false,
+          error: 'HTTP GET request failed'
+        }
+      }
+
+      const responseText = this.module!.UTF8ToString(responsePtr)
+      return {
+        status_code: 200, // Simplified - would need to parse actual response
+        data: new TextEncoder().encode(responseText),
+        success: true
+      }
+    } finally {
+      this.module!._free(urlPtr)
+    }
+  }
+
+  async checkUrlReachable(url: string): Promise<boolean> {
+    this.ensureInitialized()
+
+    const urlLen = url.length * 3 + 1
+    const urlPtr = this.module!._malloc(urlLen)
+
+    try {
+      this.module!.stringToUTF8(url, urlPtr, urlLen)
+      return Boolean(this.module!._g_web_url_is_reachable(urlPtr))
+    } finally {
+      this.module!._free(urlPtr)
+    }
+  }
+
+  async benchmarkNetworking(testUrl: string = "https://httpbin.org/bytes/1024"): Promise<number> {
+    this.ensureInitialized()
+
+    const urlLen = testUrl.length * 3 + 1
+    const urlPtr = this.module!._malloc(urlLen)
+
+    try {
+      this.module!.stringToUTF8(testUrl, urlPtr, urlLen)
+      return this.module!._g_web_networking_benchmark(urlPtr)
+    } finally {
+      this.module!._free(urlPtr)
+    }
+  }
+
+  async getNetworkingStats(): Promise<GWebNetworkStats> {
+    this.ensureInitialized()
+
+    const requestsPtr = this.module!._malloc(4)
+    const downloadedPtr = this.module!._malloc(4)
+    const uploadedPtr = this.module!._malloc(4)
+
+    try {
+      this.module!._g_web_networking_get_stats(requestsPtr, downloadedPtr, uploadedPtr)
+
+      return {
+        requests_made: this.module!.getValue(requestsPtr, 'i32'),
+        bytes_downloaded: this.module!.getValue(downloadedPtr, 'i32'),
+        bytes_uploaded: this.module!.getValue(uploadedPtr, 'i32')
+      }
+    } finally {
+      this.module!._free(requestsPtr)
+      this.module!._free(downloadedPtr)
+      this.module!._free(uploadedPtr)
+    }
+  }
+
+  // Threading functions
+  async isMainThread(): Promise<boolean> {
+    this.ensureInitialized()
+    return Boolean(this.module!._g_web_thread_is_main_thread())
+  }
+
+  async getThreadingStats(): Promise<GWebThreadingStats> {
+    this.ensureInitialized()
+
+    const activePtr = this.module!._malloc(4)
+    const totalPtr = this.module!._malloc(4)
+    const avgTimePtr = this.module!._malloc(8) // double
+
+    try {
+      this.module!._g_web_threading_get_stats(activePtr, totalPtr, avgTimePtr)
+
+      return {
+        active_threads: this.module!.getValue(activePtr, 'i32'),
+        total_created: this.module!.getValue(totalPtr, 'i32'),
+        avg_creation_time: this.module!.getValue(avgTimePtr, 'double')
+      }
+    } finally {
+      this.module!._free(activePtr)
+      this.module!._free(totalPtr)
+      this.module!._free(avgTimePtr)
+    }
+  }
+
+  async benchmarkThreading(threadCount: number = 10): Promise<number> {
+    this.ensureInitialized()
+    return this.module!._g_web_threading_benchmark(threadCount)
+  }
+
+  // Memory management
+  async getMemoryStats(): Promise<GWebMemoryStats> {
+    this.ensureInitialized()
+
+    // Allocate space for the memory stats structure
+    const statsSize = 24 // 6 * 4 bytes for 6 integers
+    const statsPtr = this.module!._malloc(statsSize)
+
+    try {
+      this.module!._g_web_memory_get_stats(statsPtr)
+
+      return {
+        total_allocated: this.module!.getValue(statsPtr + 0, 'i32'),
+        total_freed: this.module!.getValue(statsPtr + 4, 'i32'),
+        current_usage: this.module!.getValue(statsPtr + 8, 'i32'),
+        peak_usage: this.module!.getValue(statsPtr + 12, 'i32'),
+        allocation_count: this.module!.getValue(statsPtr + 16, 'i32'),
+        free_count: this.module!.getValue(statsPtr + 20, 'i32')
+      }
+    } finally {
+      this.module!._free(statsPtr)
+    }
+  }
+
+  async benchmarkMemory(): Promise<number> {
+    this.ensureInitialized()
+    return this.module!._g_web_memory_benchmark()
+  }
+
+  // Storage functions
+  async getStorageStats(): Promise<GWebStorageStats> {
+    this.ensureInitialized()
+
+    const statsSize = 16 // 4 * 4 bytes for 4 integers
+    const statsPtr = this.module!._malloc(statsSize)
+
+    try {
+      this.module!._g_web_storage_get_stats(statsPtr)
+
+      return {
+        memory_usage: this.module!.getValue(statsPtr + 0, 'i32'),
+        opfs_usage: this.module!.getValue(statsPtr + 4, 'i32'),
+        cache_usage: this.module!.getValue(statsPtr + 8, 'i32'),
+        fetch_requests: this.module!.getValue(statsPtr + 12, 'i32')
+      }
+    } finally {
+      this.module!._free(statsPtr)
+    }
+  }
+
+  async benchmarkStorage(): Promise<number> {
+    this.ensureInitialized()
+    return this.module!._g_web_storage_benchmark()
+  }
+
   private ensureInitialized(): void {
     if (!this.initialized || !this.module) {
       throw new Error('GLib WASM module not initialized. Call initialize() first.')
@@ -394,6 +856,44 @@ export default class GLib {
 
     this.module = null
     this.initialized = false
+  }
+
+  // Convenience method for comprehensive testing
+  async runFullWebNativeBenchmark(): Promise<{
+    capabilities: GWebCapabilities
+    simd: BenchmarkResult
+    crypto: number
+    networking: number
+    threading: number
+    memory: number
+    storage: number
+    stats: {
+      network: GWebNetworkStats
+      threading: GWebThreadingStats
+      memory: GWebMemoryStats
+      storage: GWebStorageStats
+    }
+  }> {
+    this.ensureInitialized()
+
+    const capabilities = await this.getWebCapabilities()
+    const simd = await this.testSIMDStrings()
+
+    return {
+      capabilities,
+      simd,
+      crypto: await this.benchmarkCrypto(),
+      networking: await this.benchmarkNetworking(),
+      threading: await this.benchmarkThreading(),
+      memory: await this.benchmarkMemory(),
+      storage: await this.benchmarkStorage(),
+      stats: {
+        network: await this.getNetworkingStats(),
+        threading: await this.getThreadingStats(),
+        memory: await this.getMemoryStats(),
+        storage: await this.getStorageStats()
+      }
+    }
   }
 }
 

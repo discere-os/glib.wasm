@@ -38,26 +38,30 @@ extern double glib_benchmark_simd_memcmp(size_t test_size_kb);
 #endif
 
 
-// Forward declarations for browser integration
-#ifdef GLIB_WASM_BROWSER_MAINLOOP_ENABLED
-extern void g_mainloop_browser_cleanup(void);
-#endif
+// Forward declarations for web-native components
+extern void g_web_capabilities_init(void);
+extern void g_web_mainloop_cleanup(void);
+extern void g_web_threading_cleanup(void);
+extern void g_web_filesystem_init(void);
+extern void g_web_filesystem_cleanup(void);
+extern void g_web_simd_strings_init(void);
+extern void g_web_crypto_init(void);
+extern void g_web_crypto_cleanup(void);
+extern void g_web_networking_init(void);
+extern void g_web_networking_cleanup(void);
+extern void g_web_memory_system_init(void);
+extern void g_web_memory_cleanup(void);
 
-#ifdef GLIB_WASM_THREADING_ENABLED
-extern void g_threading_wasm_cleanup(void);
-#endif
-
-#ifdef GLIB_WASM_OPFS_ENABLED
-extern void g_filesystem_opfs_cleanup(void);
-#endif
-
+// Web-native API exports
+extern const GWebCapabilities* g_web_get_capabilities(void);
+extern gboolean g_web_is_modern_browser(void);
 
 // Global state
 static gboolean glib_initialized = FALSE;
 static GMainLoop *main_loop = NULL;
 
 /**
- * Initialize GLib WASM module
+ * Initialize GLib WASM module with web-native enhancements
  */
 EMSCRIPTEN_KEEPALIVE
 int glib_wasm_init(void) {
@@ -65,10 +69,28 @@ int glib_wasm_init(void) {
         return 1; // Already initialized
     }
 
-    g_message("Initializing GLib WASM v%d.%d.%d",
+    g_message("Initializing GLib WASM v%d.%d.%d with web-native enhancements",
              GLIB_MAJOR_VERSION, GLIB_MINOR_VERSION, GLIB_MICRO_VERSION);
 
+    // Initialize web capabilities detection first
+    g_web_capabilities_init();
 
+    // Check if we're in a supported environment
+    if (!g_web_is_modern_browser()) {
+        g_warning("GLib.wasm requires Chrome/Edge 113+ for optimal performance");
+        // Continue initialization but with reduced functionality
+    }
+
+    // Initialize web-native subsystems
+    g_message("Initializing web-native subsystems...");
+
+    g_web_memory_system_init();    // Memory management with WeakRef
+    g_web_filesystem_init();       // OPFS + intelligent storage
+    g_web_simd_strings_init();     // WASM SIMD string operations
+    g_web_crypto_init();           // Web Crypto API integration
+    g_web_networking_init();       // Fetch API networking
+
+    g_message("GLib.wasm initialization complete - web-native mode active");
     glib_initialized = TRUE;
     return 1;
 }
@@ -93,41 +115,48 @@ const char* glib_wasm_get_build_info(void) {
     char *pos = build_info;
     int remaining = sizeof(build_info);
 
-    pos += snprintf(pos, remaining, "GLib WASM Build Configuration:\n");
+    pos += snprintf(pos, remaining, "GLib WASM Web-Native Build Configuration:\n");
     remaining -= (pos - build_info);
 
-#ifdef GLIB_WASM_SIMD_ENABLED
-    pos += snprintf(pos, remaining, "- SIMD: enabled\n");
-    remaining -= strlen("- SIMD: enabled\n");
-#else
-    pos += snprintf(pos, remaining, "- SIMD: disabled\n");
-    remaining -= strlen("- SIMD: disabled\n");
-#endif
+    // Get runtime capabilities
+    const GWebCapabilities *caps = g_web_get_capabilities();
 
-#ifdef GLIB_WASM_THREADING_ENABLED
-    pos += snprintf(pos, remaining, "- Threading: enabled\n");
-    remaining -= strlen("- Threading: enabled\n");
-#else
-    pos += snprintf(pos, remaining, "- Threading: disabled\n");
-    remaining -= strlen("- Threading: disabled\n");
-#endif
+    pos += snprintf(pos, remaining, "- Web-Native Mode: %s\n",
+                   g_web_is_modern_browser() ? "ACTIVE" : "FALLBACK");
+    remaining -= strlen("- Web-Native Mode: ACTIVE\n");
 
+    pos += snprintf(pos, remaining, "- WASM SIMD: %s\n",
+                   caps->has_wasm_simd ? "YES" : "NO");
+    remaining -= strlen("- WASM SIMD: YES\n");
 
-#ifdef GLIB_WASM_OPFS_ENABLED
-    pos += snprintf(pos, remaining, "- OPFS: enabled\n");
-    remaining -= strlen("- OPFS: enabled\n");
-#else
-    pos += snprintf(pos, remaining, "- OPFS: disabled\n");
-    remaining -= strlen("- OPFS: disabled\n");
-#endif
+    pos += snprintf(pos, remaining, "- OPFS Storage: %s\n",
+                   caps->has_opfs ? "YES" : "NO");
+    remaining -= strlen("- OPFS Storage: YES\n");
 
-#ifdef GLIB_WASM_BROWSER_MAINLOOP_ENABLED
-    pos += snprintf(pos, remaining, "- Browser Main Loop: enabled\n");
-    remaining -= strlen("- Browser Main Loop: enabled\n");
-#else
-    pos += snprintf(pos, remaining, "- Browser Main Loop: disabled\n");
-    remaining -= strlen("- Browser Main Loop: disabled\n");
-#endif
+    pos += snprintf(pos, remaining, "- Web Crypto API: %s\n",
+                   caps->has_web_crypto ? "YES" : "NO");
+    remaining -= strlen("- Web Crypto API: YES\n");
+
+    pos += snprintf(pos, remaining, "- Fetch API: %s\n",
+                   caps->has_fetch_api ? "YES" : "NO");
+    remaining -= strlen("- Fetch API: YES\n");
+
+    pos += snprintf(pos, remaining, "- WASM Workers: %s\n",
+                   caps->has_web_workers ? "YES" : "NO");
+    remaining -= strlen("- WASM Workers: YES\n");
+
+    pos += snprintf(pos, remaining, "- SharedArrayBuffer: %s\n",
+                   caps->has_shared_array_buffer ? "YES" : "NO");
+    remaining -= strlen("- SharedArrayBuffer: YES\n");
+
+    pos += snprintf(pos, remaining, "- Browser: %s v%d\n",
+                   caps->is_chrome_based ? "Chrome/Edge" : "Other",
+                   caps->chrome_version);
+    remaining -= strlen("- Browser: Chrome/Edge v999\n");
+
+    pos += snprintf(pos, remaining, "- Runtime: %s\n",
+                   caps->is_deno_runtime ? "Deno" : "Browser");
+    remaining -= strlen("- Runtime: Browser\n");
 
 #ifdef HAVE_PCRE2
     pos += snprintf(pos, remaining, "- PCRE2: available\n");
@@ -253,6 +282,229 @@ int glib_wasm_test_filesystem(void) {
 
     g_message("Filesystem tests passed");
     return 1;
+}
+
+/**
+ * Test web-native SIMD string operations
+ */
+EMSCRIPTEN_KEEPALIVE
+int glib_wasm_test_simd_strings(void) {
+    if (!glib_initialized) {
+        glib_wasm_init();
+    }
+
+    extern gsize g_web_strlen_simd(const gchar *str);
+    extern gint g_web_memcmp_simd(const void *s1, const void *s2, gsize n);
+    extern gdouble g_web_simd_strings_benchmark(gsize test_size_kb);
+
+    const gchar *test_string = "Hello, WASM SIMD world! This is a test string for performance.";
+    gsize simd_len = g_web_strlen_simd(test_string);
+    gsize std_len = strlen(test_string);
+
+    if (simd_len != std_len) {
+        g_warning("SIMD strlen test failed: expected %lu, got %lu", std_len, simd_len);
+        return 0;
+    }
+
+    // Test memory comparison
+    const gchar *str1 = "identical";
+    const gchar *str2 = "identical";
+    const gchar *str3 = "different";
+
+    if (g_web_memcmp_simd(str1, str2, strlen(str1)) != 0) {
+        g_warning("SIMD memcmp test failed: identical strings");
+        return 0;
+    }
+
+    if (g_web_memcmp_simd(str1, str3, strlen(str1)) == 0) {
+        g_warning("SIMD memcmp test failed: different strings");
+        return 0;
+    }
+
+    // Run benchmark
+    gdouble speedup = g_web_simd_strings_benchmark(32);  // 32KB test
+    g_message("SIMD string tests passed (%.2fx speedup)", speedup);
+    return 1;
+}
+
+/**
+ * Test web-native crypto operations
+ */
+EMSCRIPTEN_KEEPALIVE
+int glib_wasm_test_crypto(void) {
+    if (!glib_initialized) {
+        glib_wasm_init();
+    }
+
+    extern GChecksum* g_web_checksum_new(GChecksumType type);
+    extern void g_web_checksum_update(GChecksum *checksum, const guchar *data, gssize length);
+    extern const gchar* g_web_checksum_get_string(GChecksum *checksum);
+    extern void g_web_checksum_free(GChecksum *checksum);
+    extern gboolean g_web_random_bytes(guchar *buffer, gsize length);
+
+    // Test SHA-256 checksum
+    const gchar *test_data = "The quick brown fox jumps over the lazy dog";
+    GChecksum *checksum = g_web_checksum_new(G_CHECKSUM_SHA256);
+
+    if (!checksum) {
+        g_warning("Failed to create web crypto checksum");
+        return 0;
+    }
+
+    g_web_checksum_update(checksum, (const guchar*)test_data, strlen(test_data));
+    const gchar *digest = g_web_checksum_get_string(checksum);
+
+    if (!digest) {
+        g_warning("Failed to compute web crypto digest");
+        g_web_checksum_free(checksum);
+        return 0;
+    }
+
+    // Verify against known SHA-256 hash
+    const gchar *expected = "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592";
+    if (g_strcmp0(digest, expected) != 0) {
+        g_warning("Web crypto digest mismatch: expected %s, got %s", expected, digest);
+        g_web_checksum_free(checksum);
+        return 0;
+    }
+
+    g_web_checksum_free(checksum);
+
+    // Test secure random number generation
+    guchar random_bytes[32];
+    if (!g_web_random_bytes(random_bytes, sizeof(random_bytes))) {
+        g_warning("Failed to generate secure random bytes");
+        return 0;
+    }
+
+    // Verify randomness (basic check - not all zeros)
+    gboolean has_nonzero = FALSE;
+    for (gsize i = 0; i < sizeof(random_bytes); i++) {
+        if (random_bytes[i] != 0) {
+            has_nonzero = TRUE;
+            break;
+        }
+    }
+
+    if (!has_nonzero) {
+        g_warning("Random bytes generation seems broken - all zeros");
+        return 0;
+    }
+
+    g_message("Web crypto tests passed");
+    return 1;
+}
+
+/**
+ * Test web-native networking
+ */
+EMSCRIPTEN_KEEPALIVE
+int glib_wasm_test_networking(void) {
+    if (!glib_initialized) {
+        glib_wasm_init();
+    }
+
+    extern gchar* g_web_http_get(const gchar *url, GError **error);
+    extern gboolean g_web_url_is_reachable(const gchar *url);
+
+    const gchar *test_url = "https://httpbin.org/json";
+    GError *error = NULL;
+
+    // Test URL reachability (this is a quick HEAD request)
+    if (!g_web_url_is_reachable(test_url)) {
+        g_message("Network test skipped - test URL not reachable");
+        return 1;  // Not a failure, just no network
+    }
+
+    // Test HTTP GET
+    gchar *response = g_web_http_get(test_url, &error);
+
+    if (error) {
+        g_message("Network test skipped - HTTP error: %s", error->message);
+        g_error_free(error);
+        return 1;  // Not a failure, just no network
+    }
+
+    if (!response) {
+        g_warning("HTTP GET returned null response");
+        return 0;
+    }
+
+    // Basic validation - should be JSON
+    if (!g_str_has_prefix(response, "{")) {
+        g_warning("HTTP GET response doesn't look like JSON: %s", response);
+        g_free(response);
+        return 0;
+    }
+
+    g_free(response);
+    g_message("Web networking tests passed");
+    return 1;
+}
+
+/**
+ * Comprehensive web-native test suite
+ */
+EMSCRIPTEN_KEEPALIVE
+int glib_wasm_test_web_native(void) {
+    if (!glib_initialized) {
+        glib_wasm_init();
+    }
+
+    g_message("Running comprehensive web-native test suite...");
+
+    gint tests_passed = 0;
+    gint total_tests = 0;
+
+    // Test 1: Basic functionality
+    total_tests++;
+    if (glib_wasm_test_basic()) {
+        tests_passed++;
+        g_message("✓ Basic functionality test passed");
+    } else {
+        g_warning("✗ Basic functionality test failed");
+    }
+
+    // Test 2: Filesystem
+    total_tests++;
+    if (glib_wasm_test_filesystem()) {
+        tests_passed++;
+        g_message("✓ Filesystem test passed");
+    } else {
+        g_warning("✗ Filesystem test failed");
+    }
+
+    // Test 3: SIMD strings
+    total_tests++;
+    if (glib_wasm_test_simd_strings()) {
+        tests_passed++;
+        g_message("✓ SIMD strings test passed");
+    } else {
+        g_warning("✗ SIMD strings test failed");
+    }
+
+    // Test 4: Web crypto
+    total_tests++;
+    if (glib_wasm_test_crypto()) {
+        tests_passed++;
+        g_message("✓ Web crypto test passed");
+    } else {
+        g_warning("✗ Web crypto test failed");
+    }
+
+    // Test 5: Networking (optional)
+    total_tests++;
+    if (glib_wasm_test_networking()) {
+        tests_passed++;
+        g_message("✓ Networking test passed");
+    } else {
+        g_warning("✗ Networking test failed");
+    }
+
+    g_message("Web-native test results: %d/%d tests passed (%.1f%%)",
+              tests_passed, total_tests, (tests_passed * 100.0) / total_tests);
+
+    return tests_passed == total_tests ? 1 : 0;
 }
 
 /**

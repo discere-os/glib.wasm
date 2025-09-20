@@ -17,7 +17,22 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-// Browser feature detection
+// Web-native capability detection
+export interface GWebCapabilities {
+  has_opfs: boolean;
+  has_shared_array_buffer: boolean;
+  has_wasm_simd: boolean;
+  has_web_crypto: boolean;
+  has_web_workers: boolean;
+  has_fetch_api: boolean;
+  has_intl_apis: boolean;
+  has_request_animation_frame: boolean;
+  is_deno_runtime: boolean;
+  is_chrome_based: boolean;
+  chrome_version: number;
+}
+
+// Legacy alias for compatibility
 export interface GLibFeatures {
   webWorkers: boolean;
   sharedArrayBuffer: boolean;
@@ -143,6 +158,35 @@ export interface GLibOptions {
   maxMemoryMB?: number;
 }
 
+// Web-native performance and feature interfaces
+export interface GWebNetworkStats {
+  requests_made: number;
+  bytes_downloaded: number;
+  bytes_uploaded: number;
+}
+
+export interface GWebThreadingStats {
+  active_threads: number;
+  total_created: number;
+  avg_creation_time: number;
+}
+
+export interface GWebMemoryStats {
+  total_allocated: number;
+  total_freed: number;
+  current_usage: number;
+  peak_usage: number;
+  allocation_count: number;
+  free_count: number;
+}
+
+export interface GWebStorageStats {
+  memory_usage: number;
+  opfs_usage: number;
+  cache_usage: number;
+  fetch_requests: number;
+}
+
 // Test result interfaces
 export interface GLibTestResult {
   success: boolean;
@@ -152,6 +196,10 @@ export interface GLibTestResult {
   fileOps?: boolean;
   dirOps?: boolean;
   simdOps?: boolean;
+  cryptoOps?: boolean;
+  networkOps?: boolean;
+  threadingOps?: boolean;
+  memoryOps?: boolean;
   error?: string;
 }
 
@@ -184,4 +232,58 @@ export interface SListTestResult {
   count: number;
   items: number[];
   error?: string;
+}
+
+// Web-native specific test results
+export interface WebNativeTestResult {
+  success: boolean;
+  capabilities?: GWebCapabilities;
+  simd_performance?: number;
+  crypto_performance?: number;
+  network_performance?: number;
+  threading_performance?: number;
+  memory_performance?: number;
+  storage_performance?: number;
+  error?: string;
+}
+
+// Performance benchmark results
+export interface BenchmarkResult {
+  operation: string;
+  throughput_mbps?: number;
+  operations_per_sec?: number;
+  time_ms: number;
+  success: boolean;
+  error?: string;
+}
+
+// Network request options
+export interface NetworkRequestOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: Uint8Array;
+  timeout_ms?: number;
+}
+
+// Network response
+export interface NetworkResponse {
+  status_code: number;
+  data?: Uint8Array;
+  headers?: Record<string, string>;
+  success: boolean;
+  error?: string;
+}
+
+// Threading options
+export interface ThreadOptions {
+  name?: string;
+  stack_size?: number;
+  priority?: number;
+}
+
+// Memory allocation options
+export interface MemoryOptions {
+  track_allocations?: boolean;
+  debug_info?: string;
+  use_weak_refs?: boolean;
 }
