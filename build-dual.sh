@@ -81,7 +81,6 @@ build_side_module() {
         -DBUILD_MAIN_MODULE=OFF \
         -DENABLE_SIMD=ON \
         -DENABLE_THREADING=ON \
-        -DENABLE_WEBGPU=ON \
         -DENABLE_OPFS=ON \
         -DENABLE_BROWSER_MAINLOOP=ON \
         -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
@@ -116,7 +115,6 @@ build_main_module() {
         -DBUILD_MAIN_MODULE=OFF \
         -DENABLE_SIMD=ON \
         -DENABLE_THREADING=ON \
-        -DENABLE_WEBGPU=OFF \
         -DENABLE_OPFS=OFF \
         -DENABLE_BROWSER_MAINLOOP=OFF \
         -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"

@@ -37,9 +37,6 @@ extern gboolean glib_test_simd_functionality(void);
 extern double glib_benchmark_simd_memcmp(size_t test_size_kb);
 #endif
 
-#ifdef GLIB_WASM_WEBGPU_ENABLED
-#include "../src/webgpu-integration.h"
-#endif
 
 // Forward declarations for browser integration
 #ifdef GLIB_WASM_BROWSER_MAINLOOP_ENABLED
@@ -54,9 +51,6 @@ extern void g_threading_wasm_cleanup(void);
 extern void g_filesystem_opfs_cleanup(void);
 #endif
 
-#ifdef GLIB_WASM_WEBGPU_ENABLED
-extern void g_timing_webgpu_cleanup(void);
-#endif
 
 // Global state
 static gboolean glib_initialized = FALSE;
@@ -74,12 +68,6 @@ int glib_wasm_init(void) {
     g_message("Initializing GLib WASM v%d.%d.%d",
              GLIB_MAJOR_VERSION, GLIB_MINOR_VERSION, GLIB_MICRO_VERSION);
 
-#ifdef GLIB_WASM_WEBGPU_ENABLED
-    // Initialize WebGPU integration if available
-    if (g_webgpu_initialize(NULL)) {
-        g_message("WebGPU integration initialized");
-    }
-#endif
 
     glib_initialized = TRUE;
     return 1;
@@ -124,13 +112,6 @@ const char* glib_wasm_get_build_info(void) {
     remaining -= strlen("- Threading: disabled\n");
 #endif
 
-#ifdef GLIB_WASM_WEBGPU_ENABLED
-    pos += snprintf(pos, remaining, "- WebGPU: enabled\n");
-    remaining -= strlen("- WebGPU: enabled\n");
-#else
-    pos += snprintf(pos, remaining, "- WebGPU: disabled\n");
-    remaining -= strlen("- WebGPU: disabled\n");
-#endif
 
 #ifdef GLIB_WASM_OPFS_ENABLED
     pos += snprintf(pos, remaining, "- OPFS: enabled\n");
@@ -395,10 +376,6 @@ void glib_wasm_cleanup(void) {
     g_filesystem_opfs_cleanup();
 #endif
 
-#ifdef GLIB_WASM_WEBGPU_ENABLED
-    g_timing_webgpu_cleanup();
-    g_webgpu_cleanup();
-#endif
 
     glib_initialized = FALSE;
     g_message("GLib WASM cleanup complete");

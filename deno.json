@@ -1,7 +1,7 @@
 {
   "name": "@discere-os/glib.wasm",
   "version": "2.78.1",
-  "description": "High-performance GLib foundation library with WebAssembly, advanced browser integration, and TypeScript-first API",
+  "description": "High-performance GLib foundation library with WebAssembly, SIMD optimizations, and TypeScript-first API",
   "exports": {
     ".": "./src/lib/index.ts",
     "./types": "./src/lib/types.ts",

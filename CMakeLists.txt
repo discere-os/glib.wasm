@@ -14,7 +14,6 @@ endif()
 # Configure build options
 option(ENABLE_SIMD "Enable WASM SIMD optimizations" ON)
 option(ENABLE_THREADING "Enable SharedArrayBuffer threading" ON)
-option(ENABLE_WEBGPU "Enable WebGPU integration" ON)
 option(ENABLE_OPFS "Enable OPFS filesystem" ON)
 option(ENABLE_BROWSER_MAINLOOP "Enable browser-native main loop" ON)
 option(BUILD_SIDE_MODULE "Build as SIDE_MODULE for dynamic linking" ON)
@@ -46,7 +45,6 @@ set(WASM_LINK_FLAGS
     "-s STACK_SIZE=5MB"
     "-s ASSERTIONS=0"
     "-s FORCE_FILESYSTEM=1"
-    "-s USE_WEBGPU=1"
     "-s NO_EXIT_RUNTIME=1"
     -lidbfs.js
 )
@@ -89,17 +87,6 @@ elseif(ENABLE_THREADING AND BUILD_SIDE_MODULE)
     message(STATUS "Threading enabled - provided by host application")
 endif()
 
-# WebGPU integration
-if(ENABLE_WEBGPU AND NOT BUILD_SIDE_MODULE)
-    # MAIN_MODULE: Include WebGPU port
-    list(APPEND WASM_LINK_FLAGS --use-port=emdawnwebgpu)
-    add_compile_definitions(GLIB_WASM_WEBGPU_ENABLED=1)
-    message(STATUS "WebGPU integration enabled")
-elseif(ENABLE_WEBGPU AND BUILD_SIDE_MODULE)
-    # SIDE_MODULE: WebGPU provided by host application
-    add_compile_definitions(GLIB_WASM_WEBGPU_ENABLED=1)
-    message(STATUS "WebGPU integration enabled - provided by host application")
-endif()
 
 # OPFS filesystem
 if(ENABLE_OPFS AND NOT BUILD_SIDE_MODULE)

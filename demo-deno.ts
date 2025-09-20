@@ -19,7 +19,6 @@ async function runDemo() {
     console.log("1️⃣ Initializing GLib WASM module...")
     const glib = new GLib({
       simdOptimizations: true,
-      webgpuAcceleration: false, // Not needed for basic demo
       maxMemoryMB: 128
     })
 

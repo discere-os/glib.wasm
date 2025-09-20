@@ -46,7 +46,6 @@ export default class GLib {
   constructor(options: GLibOptions = {}) {
     this.options = {
       simdOptimizations: true,
-      webgpuAcceleration: false,
       maxMemoryMB: 256,
       ...options
     }
@@ -342,9 +341,6 @@ export default class GLib {
     return typeof globalThis.SharedArrayBuffer !== 'undefined'
   }
 
-  isWebGPUEnabled(): boolean {
-    return this.options.webgpuAcceleration === true
-  }
 
   isInitialized(): boolean {
     return this.initialized

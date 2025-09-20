@@ -21,7 +21,6 @@
 export interface GLibFeatures {
   webWorkers: boolean;
   sharedArrayBuffer: boolean;
-  webGPU: boolean;
   opfs: boolean;
   webRTC: boolean;
   dynamicLinking: boolean;
@@ -96,8 +95,6 @@ export interface GLibWASMModule {
   g_main_loop_execute_source(sourceId: number): boolean;
   g_timeout_source_execute(sourceId: number): boolean;
 
-  // WebGPU integration (when enabled)
-  g_webgpu_set_shared_device?(deviceHandle: number): void;
 
   // Standard Emscripten module properties
   ready: Promise<GLibWASMModule>;
@@ -125,10 +122,8 @@ export interface GLibWASMModule {
 // Configuration for GLib WASM initialization
 export interface GLibConfig {
   capabilities?: BrowserCapabilities;
-  webgpuOrchestrator?: any;
   enableOPFS?: boolean;
   enableThreading?: boolean;
-  enableWebGPU?: boolean;
   useSideModule?: boolean;
 }
 
@@ -136,8 +131,6 @@ export interface GLibConfig {
 export interface BrowserCapabilities {
   webWorkers: boolean;
   sharedArrayBuffer: boolean;
-  webgpu: boolean;
-  webgpuTimestampQueries: boolean;
   opfs: boolean;
   webRTC: boolean;
   dynamicLinking: boolean;
@@ -147,7 +140,6 @@ export interface BrowserCapabilities {
 // GLib WASM initialization options
 export interface GLibOptions {
   simdOptimizations?: boolean;
-  webgpuAcceleration?: boolean;
   maxMemoryMB?: number;
 }
 

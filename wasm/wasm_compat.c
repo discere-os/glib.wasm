@@ -241,16 +241,6 @@ const char *_g_locale_charset_unalias(const char *charset) {
     return charset ? charset : "UTF-8";
 }
 
-/* WebGPU integration stubs - for future implementation */
-int g_webgpu_initialize(void *config) {
-    /* WebGPU initialization stub - return success */
-    (void)config;  /* Suppress unused parameter warning */
-    return 1;  /* TRUE/success */
-}
-
-void g_webgpu_cleanup(void) {
-    /* WebGPU cleanup stub */
-}
 
 /* Browser mainloop integration stubs */
 void g_mainloop_browser_cleanup(void) {
@@ -267,10 +257,6 @@ void g_filesystem_opfs_cleanup(void) {
     /* OPFS cleanup stub */
 }
 
-/* WebGPU timing cleanup stub */
-void g_timing_webgpu_cleanup(void) {
-    /* WebGPU timing cleanup stub */
-}
 
 /* Additional missing GLib functions */
 
