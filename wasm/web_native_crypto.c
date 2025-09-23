@@ -12,7 +12,7 @@
 #include <string.h>
 
 // Forward declarations
-extern const GWebCapabilities* g_web_get_capabilities(void);
+#include "web_native_capabilities.h"
 
 // Web Crypto API integration
 EM_JS(int, crypto_digest_sha256, (const char* data, int length, char* output), {

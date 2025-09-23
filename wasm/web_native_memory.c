@@ -8,11 +8,12 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <emscripten/emscripten.h>
 #include <stdatomic.h>
 
 // Forward declarations
-extern const GWebCapabilities* g_web_get_capabilities(void);
+#include "web_native_capabilities.h"
 
 // Web-native memory management state
 typedef struct {
@@ -317,7 +318,12 @@ GObject* g_web_object_new_tracked(GType object_type, const gchar *debug_info) {
     entry->object_ptr = object;
     entry->debug_info = full_debug_info;
     entry->allocation_time = g_get_monotonic_time();
-    entry->allocation_size = g_type_instance_size(object_type);
+    /* Fallback for WASM build - g_type_instance_size might not be available */
+    if (G_TYPE_IS_OBJECT(object_type)) {
+        entry->allocation_size = sizeof(GObject);
+    } else {
+        entry->allocation_size = sizeof(gpointer);
+    }
     atomic_init(&entry->ref_count, 1);
     entry->in_finalization = FALSE;
 

@@ -11,9 +11,7 @@
 #include <wasm_simd128.h>
 #include <string.h>
 #include <stdint.h>
-
-// Forward declarations
-extern const GWebCapabilities* g_web_get_capabilities(void);
+#include "web_native_capabilities.h"
 
 // SIMD constants
 static const size_t SIMD_THRESHOLD = 32;  // Minimum size for SIMD benefit

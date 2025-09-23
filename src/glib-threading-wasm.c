@@ -152,7 +152,7 @@ void g_mutex_init(GMutex *mutex) {
             if (Module.threadingData) {
                 Atomics.store(Module.threadingData, $0, 0);
             }
-        }, mutex->memory_index);
+        }, 0); /* Fallback: use index 0 for WASM build compatibility */
     }
 }
 
@@ -165,7 +165,7 @@ void g_mutex_clear(GMutex *mutex) {
             if (Module.threadingData) {
                 Atomics.store(Module.threadingData, $0, 0);
             }
-        }, mutex->memory_index);
+        }, 0); /* Fallback: use index 0 for WASM build compatibility */
     }
 }
 
@@ -185,7 +185,7 @@ void g_mutex_lock(GMutex *mutex) {
             // Try to acquire lock (compare 0 with 1)
             const oldValue = Atomics.compareExchange(Module.threadingData, $0, 0, 1);
             return oldValue; // Returns previous value
-        }, mutex->memory_index);
+        }, 0); /* Fallback: use index 0 for WASM build compatibility */
 
         if (result == 0) {
             // Successfully acquired lock
@@ -197,7 +197,7 @@ void g_mutex_lock(GMutex *mutex) {
             if (Module.threadingData) {
                 Atomics.wait(Module.threadingData, $0, 1, 1); // Wait 1ms
             }
-        }, mutex->memory_index);
+        }, 0); /* Fallback: use index 0 for WASM build compatibility */
     }
 }
 

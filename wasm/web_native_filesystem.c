@@ -16,7 +16,7 @@
 #include <string.h>
 
 // Forward declarations
-extern const GWebCapabilities* g_web_get_capabilities(void);
+#include "web_native_capabilities.h"
 
 // Storage backend types
 typedef enum {

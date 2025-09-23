@@ -27,7 +27,9 @@
 #include "../glib/gvalgrind.h"
 #include <string.h>
 
+#ifdef HAVE_LIBFFI
 #include <ffi.h>
+#endif
 
 #include "gclosure.h"
 #include "gboxed.h"
@@ -1275,7 +1277,7 @@ g_signal_type_cclosure_new (GType    itype,
   return closure;
 }
 
-#include <ffi.h>
+#ifdef HAVE_LIBFFI
 static ffi_type *
 value_to_ffi_type (const GValue *gvalue,
                    gpointer *value,
@@ -1766,3 +1768,4 @@ g_cclosure_marshal_generic_va (GClosure *closure,
   if (return_value && G_VALUE_TYPE (return_value))
     value_from_ffi_type (return_value, rvalue);
 }
+#endif /* HAVE_LIBFFI */

@@ -12,8 +12,36 @@
 #include <emscripten/fetch.h>
 #include <string.h>
 
+// Define GIO error constants without full GIO include
+#define G_IO_ERROR g_io_error_quark()
+typedef enum {
+    G_IO_ERROR_FAILED,
+    G_IO_ERROR_NOT_FOUND,
+    G_IO_ERROR_EXISTS,
+    G_IO_ERROR_IS_DIRECTORY,
+    G_IO_ERROR_NOT_DIRECTORY,
+    G_IO_ERROR_NOT_EMPTY,
+    G_IO_ERROR_NOT_REGULAR_FILE,
+    G_IO_ERROR_NOT_SYMBOLIC_LINK,
+    G_IO_ERROR_NOT_MOUNTABLE_FILE,
+    G_IO_ERROR_FILENAME_TOO_LONG,
+    G_IO_ERROR_INVALID_FILENAME,
+    G_IO_ERROR_TOO_MANY_LINKS,
+    G_IO_ERROR_NO_SPACE,
+    G_IO_ERROR_INVALID_ARGUMENT,
+    G_IO_ERROR_PERMISSION_DENIED,
+    G_IO_ERROR_NOT_SUPPORTED,
+    G_IO_ERROR_NOT_MOUNTED,
+    G_IO_ERROR_ALREADY_MOUNTED,
+    G_IO_ERROR_CLOSED
+} GIOErrorEnum;
+
+static GQuark g_io_error_quark(void) {
+    return g_quark_from_static_string("g-io-error-quark");
+}
+
 // Forward declarations
-extern const GWebCapabilities* g_web_get_capabilities(void);
+#include "web_native_capabilities.h"
 
 // Web-native networking context
 typedef struct {

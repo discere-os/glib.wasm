@@ -28,6 +28,7 @@ set(WASM_COMPILE_FLAGS
     -DGLIB_STATIC_COMPILATION=1
     -DGLIB_WASM_NATIVE=1
     -DGLIB_COMPILATION=1
+    -DGOBJECT_COMPILATION=1
     -include${CMAKE_CURRENT_BINARY_DIR}/config.h
 )
 
@@ -276,6 +277,9 @@ set(GLIB_CORE_SOURCES
     glib/gvarianttype.c
     glib/gvarianttypeinfo.c
     glib/gversion.c
+    glib/gwakeup.c
+    glib/glib-init.c
+    glib/glib-private.c
 )
 
 # Add regex support if PCRE2 is available
@@ -283,24 +287,33 @@ if(HAVE_PCRE2)
     list(APPEND GLIB_CORE_SOURCES glib/gregex.c)
 endif()
 
-# GObject sources (if libffi available)
+# GObject sources (always include core GObject - libffi only affects marshalling)
+set(GOBJECT_SOURCES
+    gobject/gboxed.c
+    gobject/gclosure.c
+    gobject/genums.c
+    gobject/glib-enumtypes.c
+    gobject/gmarshal.c
+    gobject/gobject.c
+    gobject/gparam.c
+    gobject/gparamspecs.c
+    gobject/gsignal.c
+    gobject/gsourceclosure.c
+    gobject/gtype.c
+    gobject/gtypemodule.c
+    gobject/gtypeplugin.c
+    gobject/gvalue.c
+    gobject/gvaluetypes.c
+    gobject/gvaluetransform.c
+    gobject/gvaluearray.c
+    gobject/gatomicarray.c
+)
+
+# Marshalling support requires libffi but core GObject works without it
 if(HAVE_LIBFFI)
-    set(GOBJECT_SOURCES
-        gobject/gboxed.c
-        gobject/gclosure.c
-        gobject/genums.c
-        gobject/gmarshal.c
-        gobject/gobject.c
-        gobject/gparam.c
-        gobject/gparamspecs.c
-        gobject/gsignal.c
-        gobject/gsourceclosure.c
-        gobject/gtype.c
-        gobject/gtypemodule.c
-        gobject/gtypeplugin.c
-        gobject/gvalue.c
-        gobject/gvaluetypes.c
-    )
+    message(STATUS "GObject marshalling enabled via libffi")
+else()
+    message(STATUS "GObject core enabled - marshalling disabled (no libffi)")
 endif()
 
 # SIMD sources (when enabled)

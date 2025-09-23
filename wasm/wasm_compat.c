@@ -16,6 +16,7 @@
 /* GLib type definitions needed for stubs */
 typedef int gboolean;
 typedef char gchar;
+typedef struct _GError GError;
 #define FALSE 0
 #define TRUE 1
 
@@ -219,8 +220,7 @@ int pthread_getname_np(pthread_t thread, char *buffer, size_t length) {
 
 /* Missing GLib functions - provide minimal stubs for WASM */
 
-/* Memory management functions */
-gboolean g_mem_gc_friendly = FALSE;
+/* Memory management functions - now provided by glib-init.c */
 
 /* Environment variable access */
 const gchar* g_getenv(const gchar *variable) {
@@ -260,8 +260,7 @@ void g_filesystem_opfs_cleanup(void) {
 
 /* Additional missing GLib functions */
 
-/* Logging functions */
-gboolean g_log_always_fatal = FALSE;
+/* Logging functions - now provided by glib-init.c and gnulib/printf.c */
 
 int g_fputs(const char *str, void *file) {
     /* Use stderr for logging output by default */
@@ -269,13 +268,50 @@ int g_fputs(const char *str, void *file) {
     return fputs(str, output);
 }
 
-const char *g_log_msg_prefix = "";
+/* Missing gnulib printf functions - provide stub implementations for WASM */
+int _g_gnulib_vasnprintf(char *str, size_t size, const char *format, va_list ap) {
+    /* Fallback to standard vsnprintf */
+    return vsnprintf(str, size, format, ap);
+}
 
-/* Printf functions - use standard implementations */
 int _g_gnulib_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
     return vsnprintf(str, size, format, ap);
 }
 
 int _g_gnulib_vasprintf(char **strp, const char *format, va_list ap) {
     return vasprintf(strp, format, ap);
+}
+
+int _g_gnulib_snprintf(char *str, size_t size, const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    int result = vsnprintf(str, size, format, ap);
+    va_end(ap);
+    return result;
+}
+
+/* Unix pipe functions - stub implementations for WASM */
+int g_unix_open_pipe(int *fds, int flags, GError **error) {
+    /* Not supported in WASM - return error */
+    errno = ENOSYS;
+    return -1;
+}
+
+int g_unix_set_fd_nonblocking(int fd, int nonblocking, GError **error) {
+    /* Not supported in WASM - just return success */
+    return 1;
+}
+
+/* GObject marshal functions - minimal stubs for WASM build */
+void g_cclosure_marshal_generic(void *closure, void *return_value,
+                                unsigned n_param_values, const void *param_values,
+                                void *invocation_hint, void *marshal_data) {
+    /* Basic marshalling stub - just call the handler with no args */
+}
+
+void g_cclosure_marshal_generic_va(void *closure, void *return_value,
+                                   void *instance, va_list args_list,
+                                   void *marshal_data, int n_params,
+                                   void *param_types) {
+    /* Basic marshalling stub for va_list variant */
 }

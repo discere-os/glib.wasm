@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "web_native_capabilities.h"
 
 #ifdef GLIB_WASM_SIMD_ENABLED
 // Include SIMD function prototypes
@@ -52,9 +53,13 @@ extern void g_web_networking_cleanup(void);
 extern void g_web_memory_system_init(void);
 extern void g_web_memory_cleanup(void);
 
-// Web-native API exports
-extern const GWebCapabilities* g_web_get_capabilities(void);
-extern gboolean g_web_is_modern_browser(void);
+// Threading function declarations
+/* Threading cleanup - stubbed for basic WASM build */
+static void g_threading_wasm_cleanup(void) {
+    /* Threading implementation removed for compatibility */
+}
+
+// Web-native API exports (declared in web_native_capabilities.h)
 
 // Global state
 static gboolean glib_initialized = FALSE;

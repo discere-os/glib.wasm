@@ -12,7 +12,7 @@
 #include <emscripten/html5.h>
 
 // Forward declarations
-extern const GWebCapabilities* g_web_get_capabilities(void);
+#include "web_native_capabilities.h"
 
 // Web-native main loop state
 typedef struct {

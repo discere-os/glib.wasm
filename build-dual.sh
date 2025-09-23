@@ -127,6 +127,12 @@ build_main_module() {
 
     # GLib WASM wrapper + static library - DIRECT EMCC APPROACH
     emcc ../wasm/glib_wasm_wrapper.c ../wasm/wasm_compat.c \
+        ../wasm/web_native_capabilities.c \
+        ../wasm/web_native_simd_*.c \
+        ../wasm/web_native_crypto.c \
+        ../wasm/web_native_networking.c \
+        ../wasm/web_native_memory.c \
+        ../wasm/web_native_filesystem.c \
         -L. -lglib-wasm \
         -I.. -I../glib -I. \
         -DGLIB_STATIC_COMPILATION=1 \

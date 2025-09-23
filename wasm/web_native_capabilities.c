@@ -8,20 +8,7 @@
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
 #include <stdbool.h>
-
-// Web capability detection structure
-typedef struct {
-    gboolean has_opfs;
-    gboolean has_shared_array_buffer;
-    gboolean has_wasm_simd;
-    gboolean has_web_crypto;
-    gboolean has_intl_apis;
-    gboolean has_fetch_api;
-    gboolean has_web_workers;
-    gboolean is_deno_runtime;
-    gboolean is_chrome_based;
-    gint chrome_version;
-} GWebCapabilities;
+#include "web_native_capabilities.h"
 
 static GWebCapabilities g_web_caps = {0};
 static gboolean g_caps_detected = FALSE;
@@ -83,8 +70,8 @@ EM_JS(int, get_chrome_version, (), {
     if (typeof navigator === 'undefined') return 0;
 
     const ua = navigator.userAgent;
-    const chromeMatch = ua.match(/Chrome\/(\d+)/);
-    const edgeMatch = ua.match(/Edg\/(\d+)/);
+    const chromeMatch = ua.match(/Chrome\\/(\\d+)/);
+    const edgeMatch = ua.match(/Edg\\/(\\d+)/);
 
     if (chromeMatch) return parseInt(chromeMatch[1]);
     if (edgeMatch) return parseInt(edgeMatch[1]);
