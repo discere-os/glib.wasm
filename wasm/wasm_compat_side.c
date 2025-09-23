@@ -18,10 +18,10 @@ typedef char gchar;
 #define FALSE 0
 #define TRUE 1
 
-/* GLib global variables that need to be defined in the SIDE_MODULE */
-gboolean g_mem_gc_friendly = FALSE;
-gboolean g_log_always_fatal = FALSE;
-const char *g_log_msg_prefix = "";
+/* GLib global variables are provided by the host MAIN_MODULE
+ * These symbols are already defined in glib-init.c and linked from the host.
+ * SIDE_MODULE should not redefine them to avoid duplicate symbol errors.
+ */
 
 /* Locale and charset functions - GLib-specific implementations */
 const char **_g_locale_get_charset_aliases(void) {

@@ -54,10 +54,17 @@ extern void g_web_memory_system_init(void);
 extern void g_web_memory_cleanup(void);
 
 // Threading function declarations
-/* Threading cleanup - stubbed for basic WASM build */
-static void g_threading_wasm_cleanup(void) {
-    /* Threading implementation removed for compatibility */
-}
+extern void g_web_threading_cleanup(void);
+#ifdef GLIB_WASM_THREADING_ENABLED
+extern void g_web_threading_init_overrides(void);
+#endif
+
+// Additional web-native subsystem function declarations
+extern void g_web_filesystem_init(void);
+extern void g_web_simd_strings_init(void);
+extern void g_web_crypto_init(void);
+extern void g_mainloop_browser_cleanup(void);
+extern void g_filesystem_opfs_cleanup(void);
 
 // Web-native API exports (declared in web_native_capabilities.h)
 
@@ -94,6 +101,10 @@ int glib_wasm_init(void) {
     g_web_simd_strings_init();     // WASM SIMD string operations
     g_web_crypto_init();           // Web Crypto API integration
     g_web_networking_init();       // Fetch API networking
+
+#ifdef GLIB_WASM_THREADING_ENABLED
+    g_web_threading_init_overrides(); // Hybrid threading with PROXY_TO_PTHREAD
+#endif
 
     g_message("GLib.wasm initialization complete - web-native mode active");
     glib_initialized = TRUE;
@@ -626,7 +637,7 @@ void glib_wasm_cleanup(void) {
 #endif
 
 #ifdef GLIB_WASM_THREADING_ENABLED
-    g_threading_wasm_cleanup();
+    g_web_threading_cleanup();
 #endif
 
 #ifdef GLIB_WASM_OPFS_ENABLED

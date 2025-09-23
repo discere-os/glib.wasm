@@ -23,11 +23,17 @@ typedef struct {
     gboolean is_deno_runtime;
     gboolean is_chrome_based;
     gint chrome_version;
+    gboolean has_pthread_support;
+    gboolean has_proxy_to_pthread;
+    gboolean has_optimized_workers;
+    gint max_worker_threads;
 } GWebCapabilities;
 
 // Function declarations
 const GWebCapabilities* g_web_get_capabilities(void);
 gboolean g_web_is_modern_browser(void);
+gboolean g_web_has_optimized_threading(void);
+gboolean g_web_has_threading_support(void);
 void g_web_detect_capabilities(void);
 
 G_END_DECLS

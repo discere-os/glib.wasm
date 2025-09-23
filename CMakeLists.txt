@@ -323,11 +323,18 @@ if(ENABLE_SIMD)
     )
 endif()
 
+# Web-native sources (always included)
+set(GLIB_WEB_NATIVE_SOURCES
+    wasm/web_native_capabilities.c
+    wasm/web_native_threading.c
+)
+
 # Create main library target
 add_library(glib-wasm STATIC
     ${GLIB_CORE_SOURCES}
     ${GOBJECT_SOURCES}
     ${GLIB_SIMD_SOURCES}
+    ${GLIB_WEB_NATIVE_SOURCES}
 )
 
 # Link dependencies
@@ -348,6 +355,7 @@ if(BUILD_SIDE_MODULE)
         wasm/wasm_compat_side.c
         ${GLIB_CORE_SOURCES}
         ${GOBJECT_SOURCES}
+        ${GLIB_WEB_NATIVE_SOURCES}
     )
 
     # Don't link external dependencies - they will be resolved by host application

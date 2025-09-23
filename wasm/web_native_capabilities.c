@@ -86,6 +86,39 @@ EM_JS(int, is_chrome_based_browser, (), {
            !ua.includes('Firefox') && !ua.includes('Safari') ? 1 : 0;
 });
 
+EM_JS(int, detect_pthread_support, (), {
+    try {
+        // Check for pthreads support via Emscripten threading
+        return typeof PThread !== 'undefined' &&
+               typeof SharedArrayBuffer !== 'undefined' ? 1 : 0;
+    } catch (e) {
+        return 0;
+    }
+});
+
+EM_JS(int, detect_proxy_to_pthread, (), {
+    try {
+        // PROXY_TO_PTHREAD creates Module.PThread with specific structure
+        return typeof Module !== 'undefined' &&
+               typeof Module.PThread !== 'undefined' &&
+               typeof Module.PThread.allocateUnusedWorker === 'function' ? 1 : 0;
+    } catch (e) {
+        return 0;
+    }
+});
+
+EM_JS(int, get_max_worker_threads, (), {
+    if (typeof navigator === 'undefined') return 4;
+
+    // Use hardware concurrency when available
+    if (typeof navigator.hardwareConcurrency === 'number') {
+        return Math.min(navigator.hardwareConcurrency, 16); // Cap at 16 threads
+    }
+
+    // Conservative fallback
+    return 4;
+});
+
 /**
  * Detect all web capabilities - called once at startup
  */
@@ -102,6 +135,10 @@ static void g_web_detect_all_capabilities(void) {
     g_web_caps.is_deno_runtime = detect_deno_runtime();
     g_web_caps.is_chrome_based = is_chrome_based_browser();
     g_web_caps.chrome_version = get_chrome_version();
+    g_web_caps.has_pthread_support = detect_pthread_support();
+    g_web_caps.has_proxy_to_pthread = detect_proxy_to_pthread();
+    g_web_caps.has_optimized_workers = g_web_caps.has_web_workers && g_web_caps.has_shared_array_buffer;
+    g_web_caps.max_worker_threads = get_max_worker_threads();
 
     g_caps_detected = TRUE;
 
@@ -116,6 +153,9 @@ static void g_web_detect_all_capabilities(void) {
     g_message("  Deno Runtime: %s", g_web_caps.is_deno_runtime ? "YES" : "NO");
     g_message("  Chrome-based: %s (v%d)", g_web_caps.is_chrome_based ? "YES" : "NO",
               g_web_caps.chrome_version);
+    g_message("  Pthread Support: %s", g_web_caps.has_pthread_support ? "YES" : "NO");
+    g_message("  PROXY_TO_PTHREAD: %s", g_web_caps.has_proxy_to_pthread ? "YES" : "NO");
+    g_message("  Max Worker Threads: %d", g_web_caps.max_worker_threads);
 }
 
 /**
@@ -163,13 +203,8 @@ gboolean g_web_has_simd_support(void) {
 }
 
 /**
- * Check if we can use web workers for threading
+ * Check if we can use web workers for threading (deprecated - use enhanced version below)
  */
-EMSCRIPTEN_KEEPALIVE
-gboolean g_web_has_threading_support(void) {
-    const GWebCapabilities* caps = g_web_get_capabilities();
-    return caps->has_web_workers && caps->has_shared_array_buffer;
-}
 
 /**
  * Check if Web Crypto API is available
@@ -178,6 +213,32 @@ EMSCRIPTEN_KEEPALIVE
 gboolean g_web_has_crypto_support(void) {
     const GWebCapabilities* caps = g_web_get_capabilities();
     return caps->has_web_crypto;
+}
+
+/**
+ * Check if optimized threading is available
+ */
+EMSCRIPTEN_KEEPALIVE
+gboolean g_web_has_optimized_threading(void) {
+    const GWebCapabilities* caps = g_web_get_capabilities();
+
+    // Optimized threading requires SharedArrayBuffer + Web Workers + modern browser
+    return caps->has_shared_array_buffer &&
+           caps->has_web_workers &&
+           caps->is_chrome_based &&
+           caps->chrome_version >= 113;
+}
+
+/**
+ * Check if any threading support is available
+ */
+EMSCRIPTEN_KEEPALIVE
+gboolean g_web_has_threading_support(void) {
+    const GWebCapabilities* caps = g_web_get_capabilities();
+
+    // Either pthread support or custom worker support
+    return caps->has_pthread_support ||
+           (caps->has_web_workers && caps->has_shared_array_buffer);
 }
 
 /**

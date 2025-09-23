@@ -13,6 +13,9 @@
 #include <stdarg.h>
 #include <emscripten/emscripten.h>
 
+/* Forward declaration for g_debug to avoid dependency on full GLib headers */
+void g_debug(const char *format, ...);
+
 /* GLib type definitions needed for stubs */
 typedef int gboolean;
 typedef char gchar;
@@ -315,3 +318,12 @@ void g_cclosure_marshal_generic_va(void *closure, void *return_value,
                                    void *param_types) {
     /* Basic marshalling stub for va_list variant */
 }
+
+/* Web-native subsystem implementations are provided by dedicated files:
+ * - web_native_memory.c: g_web_memory_system_init, g_web_memory_cleanup
+ * - web_native_filesystem.c: g_web_filesystem_init
+ * - web_native_simd_strings.c: g_web_simd_strings_init
+ * - web_native_crypto.c: g_web_crypto_init
+ * - web_native_networking.c: g_web_networking_init, g_web_networking_cleanup
+ * These functions are no longer defined here to avoid duplicate symbol errors.
+ */
