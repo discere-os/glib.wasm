@@ -19,6 +19,8 @@ void g_debug(const char *format, ...);
 /* GLib type definitions needed for stubs */
 typedef int gboolean;
 typedef char gchar;
+typedef unsigned long GType;
+typedef unsigned int GQuark;
 typedef struct _GError GError;
 #define FALSE 0
 #define TRUE 1
@@ -317,6 +319,127 @@ void g_cclosure_marshal_generic_va(void *closure, void *return_value,
                                    void *marshal_data, int n_params,
                                    void *param_types) {
     /* Basic marshalling stub for va_list variant */
+}
+
+/* Missing printf function */
+int _g_gnulib_vfprintf(FILE *stream, const char *format, va_list ap) {
+    return vfprintf(stream, format, ap);
+}
+
+/* GIO stub implementations for WASM build */
+typedef struct _GFile GFile;
+
+GQuark g_io_error_quark(void) {
+    static GQuark quark = 0;
+    if (quark == 0) {
+        /* Simple hash of "g-io-error-quark" string */
+        quark = 12345; /* Fixed quark for IO errors */
+    }
+    return quark;
+}
+
+GFile* g_file_new_for_path(const char *path) {
+    /* Return a dummy GFile pointer - real implementation would allocate */
+    static int dummy_file = 42;
+    return (GFile*)&dummy_file;
+}
+
+char* g_file_get_path(GFile *file) {
+    /* Return a dummy path - real implementation would get actual path */
+    return strdup("/dummy/path");
+}
+
+/* GModule stub implementations for WASM build */
+typedef struct _GModule GModule;
+typedef enum {
+    G_MODULE_BIND_LAZY = 1,
+    G_MODULE_BIND_LOCAL = 2
+} GModuleFlags;
+
+GModule* g_module_open(const char *file_name, GModuleFlags flags) {
+    /* Module loading not supported in WASM */
+    return NULL;
+}
+
+const char* g_module_error(void) {
+    return "Module loading not supported in WebAssembly environment";
+}
+
+int g_module_symbol(GModule *module, const char *symbol_name, void **symbol) {
+    /* Symbol lookup not supported in WASM */
+    if (symbol) *symbol = NULL;
+    return 0; /* FALSE */
+}
+
+int g_module_close(GModule *module) {
+    /* Nothing to close in WASM stub */
+    return 1; /* TRUE */
+}
+
+int g_module_supported(void) {
+    /* Module loading not supported in WASM */
+    return 0; /* FALSE */
+}
+
+/* Additional GIO function stubs for WASM build */
+typedef struct _GIcon GIcon;
+typedef struct _GLoadableIcon GLoadableIcon;
+typedef struct _GTask GTask;
+typedef struct _GMemoryInputStream GMemoryInputStream;
+typedef struct _GIOChannel GIOChannel;
+typedef struct _GBytes GBytes;
+
+/* GIcon type functions */
+GType g_icon_get_type(void) {
+    static GType type = 0;
+    if (type == 0) {
+        type = 1001; /* Fixed type ID for GIcon */
+    }
+    return type;
+}
+
+GType g_loadable_icon_get_type(void) {
+    static GType type = 0;
+    if (type == 0) {
+        type = 1002; /* Fixed type ID for GLoadableIcon */
+    }
+    return type;
+}
+
+/* GTask stub implementations */
+int g_task_is_valid(void *task, void *source_object) {
+    /* Task validation not supported in WASM */
+    return 0; /* FALSE */
+}
+
+void* g_task_propagate_pointer(GTask *task, GError **error) {
+    /* Task result propagation not supported in WASM */
+    if (error) *error = NULL;
+    return NULL;
+}
+
+GTask* g_task_new(void *source_object, void *cancellable, void *callback, void *callback_data) {
+    /* Task creation not supported in WASM */
+    static int dummy_task = 123;
+    return (GTask*)&dummy_task;
+}
+
+void g_task_return_pointer(GTask *task, void *result, void *result_destroy) {
+    /* Task result return not supported in WASM */
+}
+
+/* GMemoryInputStream stub implementation */
+GMemoryInputStream* g_memory_input_stream_new_from_bytes(GBytes *bytes) {
+    /* Memory input stream not supported in WASM */
+    static int dummy_stream = 456;
+    return (GMemoryInputStream*)&dummy_stream;
+}
+
+/* GIOChannel stub implementation */
+GIOChannel* g_io_channel_new_file(const char *filename, const char *mode, GError **error) {
+    /* IO channel not supported in WASM */
+    if (error) *error = NULL;
+    return NULL;
 }
 
 /* Web-native subsystem implementations are provided by dedicated files:

@@ -327,6 +327,7 @@ endif()
 set(GLIB_WEB_NATIVE_SOURCES
     wasm/web_native_capabilities.c
     wasm/web_native_threading.c
+    wasm/wasm_compat.c
 )
 
 # Create main library target
