@@ -388,6 +388,8 @@ typedef struct _GTask GTask;
 typedef struct _GMemoryInputStream GMemoryInputStream;
 typedef struct _GIOChannel GIOChannel;
 typedef struct _GBytes GBytes;
+typedef struct _GListModel GListModel;
+typedef struct _GListModelInterface GListModelInterface;
 
 /* GIcon type functions */
 GType g_icon_get_type(void) {
@@ -441,6 +443,121 @@ GIOChannel* g_io_channel_new_file(const char *filename, const char *mode, GError
     if (error) *error = NULL;
     return NULL;
 }
+
+/* GListModel stub implementations for Pango */
+
+/* Define the interface structure */
+typedef struct _GListModelInterface GListModelInterface;
+struct _GListModelInterface {
+    void* g_iface;
+    void* get_item_type;
+    void* get_n_items;
+    void* get_item;
+};
+
+/* Register the GListModel type */
+GType g_list_model_get_type(void) {
+    static GType type = 0;
+    if (type == 0) {
+        type = 1003; /* Fixed type ID for GListModel */
+    }
+    return type;
+}
+
+/* G_TYPE_LIST_MODEL is defined as a macro, so we need the function available */
+
+void g_list_model_items_changed(GListModel *list, unsigned int position,
+                                unsigned int removed, unsigned int added) {
+    /* List model change notification not supported in WASM */
+}
+
+void* G_LIST_MODEL(void* obj) {
+    /* Type casting stub for GListModel */
+    return obj;
+}
+
+/* Additional GListModel interface functions */
+GType g_list_model_get_item_type(GListModel *list) {
+    /* Return generic object type */
+    return 1001;
+}
+
+unsigned int g_list_model_get_n_items(GListModel *list) {
+    /* Return zero items */
+    return 0;
+}
+
+void* g_list_model_get_item(GListModel *list, unsigned int position) {
+    /* Return NULL for any position */
+    return NULL;
+}
+
+void* g_list_model_get_object(GListModel *list, unsigned int position) {
+    /* Return NULL for any position */
+    return NULL;
+}
+
+/* GLib atomic reference counting functions - stub implementations for WASM */
+
+void* g_atomic_rc_box_alloc0(size_t block_size) {
+    /* Simple malloc-based allocation - no atomic ref counting in WASM */
+    void *ptr = malloc(block_size);
+    if (ptr) {
+        memset(ptr, 0, block_size);
+    }
+    return ptr;
+}
+
+void* g_atomic_rc_box_acquire(void* mem_block) {
+    /* In WASM, just return the same pointer - no ref counting */
+    return mem_block;
+}
+
+void g_atomic_rc_box_release_full(void* mem_block, void* clear_func) {
+    /* In WASM, just free the memory - no ref counting */
+    if (mem_block) {
+        free(mem_block);
+    }
+}
+
+/* Additional missing GLib functions */
+
+/* Process spawning functions - not supported in WASM */
+int g_spawn_async_with_pipes(const char *working_directory,
+                             char **argv,
+                             char **envp,
+                             void* flags,
+                             void* child_setup,
+                             void* user_data,
+                             void* child_pid,
+                             int *standard_input,
+                             int *standard_output,
+                             int *standard_error,
+                             GError **error) {
+    /* Process spawning not supported in WASM */
+    if (error) *error = NULL;
+    return 0; /* FALSE */
+}
+
+void g_spawn_close_pid(void* pid) {
+    /* No-op in WASM */
+}
+
+/* Additional gnulib printf function */
+int _g_gnulib_vprintf(const char *format, va_list ap) {
+    return vprintf(format, ap);
+}
+
+/* GType for Unicode script - simple stub */
+GType g_unicode_script_get_type(void) {
+    static GType type = 0;
+    if (type == 0) {
+        type = 2001; /* Fixed type ID for GUnicodeScript */
+    }
+    return type;
+}
+
+#define G_TYPE_UNICODE_SCRIPT (g_unicode_script_get_type())
 
 /* Web-native subsystem implementations are provided by dedicated files:
  * - web_native_memory.c: g_web_memory_system_init, g_web_memory_cleanup
