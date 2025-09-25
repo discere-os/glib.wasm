@@ -1,0 +1,8 @@
+# TAP test template for glib.wasm meson build
+# This template is required by the meson build system
+
+[test]
+name = @TEST_NAME@
+description = @TEST_DESCRIPTION@
+executable = @TEST_EXECUTABLE@
+protocol = tap
