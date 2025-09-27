@@ -23,7 +23,11 @@
 #include "config.h"
 #include "glibconfig.h"
 
-#ifndef G_OS_WIN32
+#if defined(G_OS_WIN32)
+/* Windows uses a dedicated shim in win_iconv.c */
+#elif defined(__EMSCRIPTEN__)
+#include "wasm/wasm_iconv.h"
+#else
 #include <iconv.h>
 #endif
 #include <errno.h>
@@ -34,6 +38,8 @@
 #ifdef G_OS_WIN32
 #include <windows.h>
 #include "win_iconv.c"
+#elif defined(__EMSCRIPTEN__)
+/* Implemented in wasm/wasm_iconv.c */
 #endif
 
 #include "gconvert.h"

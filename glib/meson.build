@@ -351,6 +351,10 @@ glib_sources += files(
   'gprintf.c',
 )
 
+if host_system == 'emscripten'
+  glib_sources += files('wasm/wasm_iconv.c')
+endif
+
 platform_deps = []
 
 if host_system == 'windows'

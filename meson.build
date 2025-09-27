@@ -293,7 +293,11 @@ glib_conf.set_quoted('PACKAGE_STRING', 'glib @0@'.format(meson.project_version()
 glib_conf.set_quoted('PACKAGE_TARNAME', 'glib')
 glib_conf.set_quoted('PACKAGE_URL', '')
 glib_conf.set_quoted('PACKAGE_VERSION', meson.project_version())
-glib_conf.set('ENABLE_NLS', 1)
+if get_option('nls').disabled()
+  glib_conf.set('ENABLE_NLS', 0)
+else
+  glib_conf.set('ENABLE_NLS', 1)
+endif
 
 # used by the .rc.in files
 glibconfig_conf.set('LT_CURRENT_MINUS_AGE', soversion)
@@ -2233,8 +2237,17 @@ if host_system == 'windows'
   # We have a #include "win_iconv.c" in gconvert.c on Windows, so we don't need
   # any external library for it
   libiconv = []
+  glib_conf.set('HAVE_ICONV', 1)
+elif host_system == 'emscripten'
+  libiconv = []
+  glib_conf.set('HAVE_ICONV', 1)
 else
   libiconv = dependency('iconv')
+  if libiconv.found()
+    glib_conf.set('HAVE_ICONV', 1)
+  else
+    glib_conf.set('HAVE_ICONV', 0)
+  endif
 endif
 
 pcre2_req = '>=10.32'
@@ -2286,6 +2299,12 @@ subproject('gvdb', default_options: {'tests': false})
 gvdb_dep = dependency('gvdb')
 
 libm = cc.find_library('m', required : false)
+if libm.found()
+  gnulib_libm_dependency = [libm]
+else
+  libm = declare_dependency()
+  gnulib_libm_dependency = []
+endif
 libffi_dep = dependency('libffi', version : '>= 3.0.0')
 
 libz_dep = dependency('zlib')
@@ -2303,51 +2322,48 @@ endif
 # proxy-libintl subproject.
 # FIXME: glib-gettext.m4 has much more checks to detect broken/incompatible
 # implementations. This could be extended if issues are found in some platforms.
-libintl_deps = []
-libintl_prefix = '#include <libintl.h>'
-libintl = dependency('intl', required: false)
-if libintl.found() and libintl.type_name() != 'internal'
-  # libintl supports different threading APIs, which may not
-  # require additional flags, but it defaults to using pthreads if
-  # found. Meson's "threads" dependency does not allow you to
-  # prefer pthreads. We may not be using pthreads for glib itself
-  # either so just link the library to satisfy libintl rather than
-  # also defining the macros with the -pthread flag.
-  #
-  # Meson's builtin dependency lookup as of 0.60.0 doesn't check for
-  # pthread, so we do this manually here.
-  if cc.has_function('ngettext', dependencies : libintl, prefix: libintl_prefix)
-    libintl_deps += [libintl]
-  else
-    libintl_iconv = cc.find_library('iconv', required : false)
-    if libintl_iconv.found() and cc.has_function('ngettext', args : osx_ldflags, dependencies : [libintl, libintl_iconv])
-      libintl_deps += [libintl, libintl_iconv]
+if get_option('nls').disabled()
+  libintl_deps = []
+  libintl = disabler()
+  have_bind_textdomain_codeset = false
+  glib_conf.set('HAVE_DCGETTEXT', 0)
+  glib_conf.set('HAVE_GETTEXT', 0)
+else
+  libintl_deps = []
+  libintl_prefix = '#include <libintl.h>'
+  libintl = dependency('intl', required: false)
+  if libintl.found() and libintl.type_name() != 'internal'
+    if cc.has_function('ngettext', dependencies : libintl, prefix: libintl_prefix)
+      libintl_deps += [libintl]
     else
-      libintl_pthread = cc.find_library('pthread', required : false)
-      if libintl_pthread.found() and cc.has_function('ngettext', dependencies : [libintl, libintl_pthread], prefix: libintl_prefix)
-        libintl_deps += [libintl, libintl_pthread]
+      libintl_iconv = cc.find_library('iconv', required : false)
+      if libintl_iconv.found() and cc.has_function('ngettext', args : osx_ldflags, dependencies : [libintl, libintl_iconv])
+        libintl_deps += [libintl, libintl_iconv]
       else
-        libintl = disabler()
+        libintl_pthread = cc.find_library('pthread', required : false)
+        if libintl_pthread.found() and cc.has_function('ngettext', dependencies : [libintl, libintl_pthread], prefix: libintl_prefix)
+          libintl_deps += [libintl, libintl_pthread]
+        else
+          libintl = disabler()
+        endif
       endif
     endif
   endif
-endif
 
-if libintl.found() and libintl.type_name() != 'internal'
-  have_bind_textdomain_codeset = cc.has_function('bind_textdomain_codeset', dependencies: libintl_deps, prefix: libintl_prefix)
-else
-  # using proxy-libintl fallback
-  libintl = dependency('intl', allow_fallback: true)
-  assert(libintl.type_name() == 'internal')
-  libintl_deps = [libintl]
-  have_bind_textdomain_codeset = true  # proxy-libintl supports it
+  if libintl.found() and libintl.type_name() != 'internal'
+    have_bind_textdomain_codeset = cc.has_function('bind_textdomain_codeset', dependencies: libintl_deps, prefix: libintl_prefix)
+  else
+    libintl = dependency('intl', allow_fallback: true)
+    assert(libintl.type_name() == 'internal')
+    libintl_deps = [libintl]
+    have_bind_textdomain_codeset = true  # proxy-libintl supports it
+  endif
+
+  glib_conf.set('HAVE_DCGETTEXT', 1)
+  glib_conf.set('HAVE_GETTEXT', 1)
 endif
 
 glib_conf.set('HAVE_BIND_TEXTDOMAIN_CODESET', have_bind_textdomain_codeset)
-
-# We require gettext to always be present
-glib_conf.set('HAVE_DCGETTEXT', 1)
-glib_conf.set('HAVE_GETTEXT', 1)
 
 glib_conf.set_quoted('GLIB_LOCALE_DIR', glib_localedir)
 

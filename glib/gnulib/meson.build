@@ -312,6 +312,17 @@ else
   gl_cv_func_frexpl_broken_beyond_repair = true
 endif
 
+if host_system == 'emscripten'
+  gl_cv_func_frexp_works = true
+  gl_cv_func_frexp_broken_beyond_repair = false
+  gl_cv_func_frexpl_works = true
+  gl_cv_func_frexpl_broken_beyond_repair = false
+  gl_cv_func_frexp_decl = true
+  gl_cv_func_frexpl_decl = true
+  gl_cv_func_ldexpl_works = true
+  gl_cv_func_ldexpl_decl = true
+endif
+
 if not gl_cv_func_frexp_works and gl_cv_func_frexp_broken_beyond_repair
   error ('frexp() is missing or broken beyond repair, and we have nothing to replace it with')
 endif
