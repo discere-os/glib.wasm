@@ -369,33 +369,93 @@ jobs:
         id: release-version
         run: echo "VERSION=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
+      - name: Calculate SHA-256
+        id: sha
+        run: |
+          WASM_FILE="install/wasm/glib-side.wasm"
+          SHA=$(sha256sum "$WASM_FILE" | awk '{print $1}')
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
+          echo "${SHA}" > "${WASM_FILE}.sha256"
+          echo "🔒 SHA-256: ${SHA}"
+
       - name: Deploy versioned WASM to Cloudflare R2
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: |
-            r2 object put discere-os-wasm-production/glib/${{ steps.release-version.outputs.VERSION }}/side/glib-side.wasm --file=install/wasm/glib-side.wasm
-            r2 object put discere-os-wasm-production/glib/${{ steps.release-version.outputs.VERSION }}/main/glib-release.js --file=install/wasm/glib-release.js
-            r2 object put discere-os-wasm-production/glib/${{ steps.release-version.outputs.VERSION }}/main/glib-release.wasm --file=install/wasm/glib-release.wasm
-            r2 object put discere-os-wasm-production/glib/${{ steps.release-version.outputs.VERSION }}/package.json --file=package.json
+            VERSION="${{ steps.release-version.outputs.VERSION }}"
 
-      - name: Deploy latest WASM to Cloudflare R2
+            # Deploy to @version path (immutable)
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm \
+              --file=install/wasm/glib-side.wasm \
+              --content-type=application/wasm \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm.sha256 \
+              --file=install/wasm/glib-side.wasm.sha256 \
+              --content-type=text/plain \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.js \
+              --file=install/wasm/glib-release.js \
+              --content-type=application/javascript \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.wasm \
+              --file=install/wasm/glib-release.wasm \
+              --content-type=application/wasm \
+              --cache-control="public, max-age=31536000, immutable"
+
+      - name: Deploy SHA path to Cloudflare R2
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: |
-            # Deploy latest version (cache: 1 hour)
-            r2 object put discere-os-wasm-production/glib/latest/side/glib-side.wasm --file=install/wasm/glib-side.wasm
-            r2 object put discere-os-wasm-production/glib/latest/main/glib-release.js --file=install/wasm/glib-release.js
-            r2 object put discere-os-wasm-production/glib/latest/main/glib-release.wasm --file=install/wasm/glib-release.wasm
-            r2 object put discere-os-wasm-production/glib/latest/package.json --file=package.json
+            SHA="${{ steps.sha.outputs.sha }}"
+            SHA_SHORT="${SHA:0:7}"
+
+            # Deploy to @sha-xxx path (content-addressable, immutable)
+            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-side.wasm \
+              --file=install/wasm/glib-side.wasm \
+              --content-type=application/wasm \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-side.wasm.sha256 \
+              --file=install/wasm/glib-side.wasm.sha256 \
+              --content-type=text/plain \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-release.js \
+              --file=install/wasm/glib-release.js \
+              --content-type=application/javascript \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-release.wasm \
+              --file=install/wasm/glib-release.wasm \
+              --content-type=application/wasm \
+              --cache-control="public, max-age=31536000, immutable"
+
+      - name: Update latest pointer
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: |
+            VERSION="${{ steps.release-version.outputs.VERSION }}"
+            echo "${VERSION}" > latest.txt
+
+            # Update @latest.txt pointer (short cache)
+            r2 object put discere-os-wasm-production/glib/@latest.txt \
+              --file=latest.txt \
+              --content-type=text/plain \
+              --cache-control="public, max-age=300"
 
       - name: Verify Cloudflare deployment
         run: |
           sleep 15  # Wait for R2 propagation
-          curl -f "https://wasm.discere.cloud/glib@${{ steps.release-version.outputs.VERSION }}/package.json" || exit 1
+          curl -f "https://wasm.discere.cloud/glib@${{ steps.release-version.outputs.VERSION }}/glib-side.wasm" || exit 1
           echo "✅ Cloudflare R2 deployment verified"
 
   deploy-cloudflare-snapshot:
@@ -429,16 +489,43 @@ jobs:
         id: version
         run: echo "VERSION=sha-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Calculate SHA-256
+        id: sha
+        run: |
+          WASM_FILE="install/wasm/glib-side.wasm"
+          SHA=$(sha256sum "$WASM_FILE" | awk '{print $1}')
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
+          echo "${SHA}" > "${WASM_FILE}.sha256"
+          echo "🔒 SHA-256: ${SHA}"
+
       - name: Deploy snapshot WASM to Cloudflare R2
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: |
-            r2 object put discere-os-wasm-production/glib/${{ steps.version.outputs.VERSION }}/side/glib-side.wasm --file=install/wasm/glib-side.wasm
-            r2 object put discere-os-wasm-production/glib/${{ steps.version.outputs.VERSION }}/main/glib-release.js --file=install/wasm/glib-release.js
-            r2 object put discere-os-wasm-production/glib/${{ steps.version.outputs.VERSION }}/main/glib-release.wasm --file=install/wasm/glib-release.wasm
-            r2 object put discere-os-wasm-production/glib/${{ steps.version.outputs.VERSION }}/package.json --file=package.json
+            VERSION="${{ steps.version.outputs.VERSION }}"
+
+            # Deploy to @sha-xxx path (snapshot)
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm \
+              --file=install/wasm/glib-side.wasm \
+              --content-type=application/wasm \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm.sha256 \
+              --file=install/wasm/glib-side.wasm.sha256 \
+              --content-type=text/plain \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.js \
+              --file=install/wasm/glib-release.js \
+              --content-type=application/javascript \
+              --cache-control="public, max-age=31536000, immutable"
+
+            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.wasm \
+              --file=install/wasm/glib-release.wasm \
+              --content-type=application/wasm \
+              --cache-control="public, max-age=31536000, immutable"
 
       - name: Log deployment success
         run: echo "✅ Snapshot ${{ steps.version.outputs.VERSION }} deployed to Cloudflare R2"
