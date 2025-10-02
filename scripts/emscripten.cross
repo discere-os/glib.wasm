@@ -4,7 +4,7 @@ cpp = 'em++'
 ar = 'emar'
 ranlib = 'emranlib'
 strip = 'llvm-strip'
-pkgconfig = 'em-pkg-config'
+pkgconfig = 'pkg-config'
 
 [built-in options]
 c_args = []

@@ -1817,7 +1817,16 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
   endforeach
 endif
 
-if g_sizet_compatibility['short']
+# Emscripten defines size_t as 'unsigned long', not 'unsigned int', even though both are 32-bit
+# We must use 'long' to avoid incompatible pointer type errors
+if host_system == 'emscripten' and g_sizet_compatibility['long']
+  glibconfig_conf.set('glib_size_type_define', 'long')
+  glibconfig_conf.set_quoted('gsize_modifier', 'l')
+  glibconfig_conf.set_quoted('gssize_modifier', 'l')
+  glibconfig_conf.set_quoted('gsize_format', 'lu')
+  glibconfig_conf.set_quoted('gssize_format', 'li')
+  glibconfig_conf.set('glib_msize_type', 'LONG')
+elif g_sizet_compatibility['short']
   glibconfig_conf.set('glib_size_type_define', 'short')
   glibconfig_conf.set_quoted('gsize_modifier', 'h')
   glibconfig_conf.set_quoted('gssize_modifier', 'h')

@@ -18,7 +18,7 @@ gnetworking_h_conf = configuration_data()
 
 gnetworking_h_nameser_compat_include = ''
 
-if host_system not in ['windows', 'android']
+if host_system not in ['windows', 'android', 'emscripten']
   # Don't check for C_IN on Android since it does not define it in public
   # headers, we define it ourselves wherever necessary
   if not cc.compiles('''#include <sys/types.h>
@@ -39,7 +39,7 @@ endif
 
 network_libs = [ ]
 network_args = [ ]
-if host_system != 'windows'
+if host_system not in ['windows', 'emscripten']
   # res_query()
   res_query_test = '''#include <resolv.h>
                       int main (int argc, char ** argv) {
