@@ -28,6 +28,7 @@ glib_side_link_args = [
   '-fPIC',
   '-O3',
   '-flto',
+  '-sERROR_ON_UNDEFINED_SYMBOLS=0',  # Host provides dependencies
   '-sEXPORTED_FUNCTIONS=["_glib_wasm_version"]',
 ]
 
@@ -36,6 +37,7 @@ shared_module(
   files('glib_wasm_side.c'),
   dependencies: [libglib_dep],
   name_prefix: '',
+  name_suffix: 'wasm',
   c_args: glib_wasm_cargs,
   link_args: glib_side_link_args,
   install: true,
