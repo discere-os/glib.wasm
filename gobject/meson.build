@@ -23,6 +23,7 @@ gobject_install_headers = files(
   'gvaluecollector.h',
   'gvaluetypes.h',
   'gobjectnotifyqueue.c', # sic
+  'gobject-wasm.h',
 )
 
 gobject_sources = []
@@ -58,6 +59,7 @@ gobject_sources += files(
   'gvaluearray.c',
   'gvaluetransform.c',
   'gvaluetypes.c',
+  'gobject-wasm.c',
 )
 
 if host_system == 'windows' and glib_build_shared

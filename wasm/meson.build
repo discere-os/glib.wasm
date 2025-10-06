@@ -13,11 +13,18 @@ glib_main_link_args = [
   '-flto',
 ]
 
+# MAIN_MODULE with WASM-specific sources
+glib_wasm_main_sources = files(
+  'glib_wasm_module.c',
+  'gobject_wasm_unified_memory.c',
+  'web_native_capabilities.c',
+)
+
 executable(
   'glib-main',
-  files('glib_wasm_module.c'),
-  dependencies: [libglib_dep],
-  c_args: glib_wasm_cargs,
+  glib_wasm_main_sources,
+  dependencies: [libglib_dep, libgobject_dep],
+  c_args: glib_wasm_cargs + ['-DGOBJECT_MAIN_MODULE=1'],
   link_args: glib_main_link_args,
   install: true,
   install_dir: get_option('bindir'),
@@ -32,13 +39,18 @@ glib_side_link_args = [
   '-sEXPORTED_FUNCTIONS=["_glib_wasm_version"]',
 ]
 
+# SIDE_MODULE with minimal sources (imports from MAIN)
+glib_wasm_side_sources = files(
+  'glib_wasm_side.c',
+)
+
 shared_module(
   'glib-side',
-  files('glib_wasm_side.c'),
+  glib_wasm_side_sources,
   dependencies: [libglib_dep],
   name_prefix: '',
   name_suffix: 'wasm',
-  c_args: glib_wasm_cargs,
+  c_args: glib_wasm_cargs + ['-DGOBJECT_SIDE_MODULE=1', '-DBUILD_SIDE_MODULE=1'],
   link_args: glib_side_link_args,
   install: true,
   install_dir: get_option('libdir'),

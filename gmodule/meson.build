@@ -76,7 +76,13 @@ gmodule_visibility_h = custom_target(
   install_dir: g_module_includedir,
 )
 
-gmodule_sources = [gmodule_c, gmodule_visibility_h, gmodule_deprecated_c]
+# Add WASM-enhanced gmodule if building for Emscripten
+if host_machine.system() == 'emscripten'
+  gmodule_wasm_c = files('gmodule-wasm.c')
+  gmodule_sources = [gmodule_c, gmodule_visibility_h, gmodule_deprecated_c, gmodule_wasm_c]
+else
+  gmodule_sources = [gmodule_c, gmodule_visibility_h, gmodule_deprecated_c]
+endif
 
 if host_system == 'windows' and glib_build_shared
   gmodule_win_rc = configure_file(
