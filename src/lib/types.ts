@@ -137,8 +137,10 @@ export interface GLibWASMModule {
 // Configuration for GLib WASM initialization
 export interface GLibConfig {
   capabilities?: BrowserCapabilities;
+  webgpuOrchestrator?: any;
   enableOPFS?: boolean;
   enableThreading?: boolean;
+  enableWebGPU?: boolean;
   useSideModule?: boolean;
 }
 
@@ -146,6 +148,8 @@ export interface GLibConfig {
 export interface BrowserCapabilities {
   webWorkers: boolean;
   sharedArrayBuffer: boolean;
+  webgpu: boolean;
+  webgpuTimestampQueries: boolean;
   opfs: boolean;
   webRTC: boolean;
   dynamicLinking: boolean;

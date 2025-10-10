@@ -897,5 +897,11 @@ export default class GLib {
   }
 }
 
+// Re-export feature detection
+export { detectBrowserCapabilities } from './feature-detection.ts'
+
+// Re-export loader utilities
+export { getMonotonicTimeNS, initializeGLib, testFilesystem } from './loader.ts'
+
 // Re-export types
 export type * from './types.ts'
