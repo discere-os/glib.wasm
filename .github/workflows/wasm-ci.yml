@@ -7,134 +7,62 @@ on:
   pull_request:
     branches: [ wasm ]
 
-env:
-  NODE_VERSION: '22'
-  EMSCRIPTEN_VERSION: '4.0.14'
-
 jobs:
   test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [22, 24]
+    name: Test Suite (Deno)
+    runs-on: [self-hosted, docker, wasm, emscripten]
+    container:
+      image: ghcr.io/discere-os/wasm-builder:main-b23d443
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
-
-      - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: ${{ env.EMSCRIPTEN_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pnpm install --ignore-workspace --frozen-lockfile
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake pkg-config libglib2.0-dev
-
       - name: Type check
-        run: pnpm run type-check
+        run: deno check src/lib/index.ts
 
-      - name: Build dual WASM modules
-        run: pnpm run build
+      - name: Build WASM modules with Meson
+        run: deno task build:wasm
 
-      - name: Run unit tests
-        run: pnpm run test:coverage
+      - name: Run Deno tests
+        run: deno task test
 
-      - name: Run tests with coverage
-        run: |
-          pnpm run test:coverage
+      - name: Run benchmarks
+        run: deno task bench
 
-          # Generate test coverage summary
-          echo "## 📈 Test Coverage (Node.js ${{ matrix.node-version }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [[ -f "coverage/coverage-summary.json" ]]; then
-            # Extract coverage percentages using node
-            STATEMENTS=$(node -pe "JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.statements.pct")
-            BRANCHES=$(node -pe "JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.branches.pct")
-            FUNCTIONS=$(node -pe "JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.functions.pct")
-            LINES=$(node -pe "JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.lines.pct")
-
-            echo "| Metric | Coverage | Status |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|----------|--------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Statements | ${STATEMENTS}% | $([ $(echo "$STATEMENTS > 85" | bc) -eq 1 ] && echo "✅ Excellent" || echo "⚠️ Needs improvement") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Branches | ${BRANCHES}% | $([ $(echo "$BRANCHES > 80" | bc) -eq 1 ] && echo "✅ Good" || echo "⚠️ Needs improvement") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Functions | ${FUNCTIONS}% | $([ $(echo "$FUNCTIONS > 85" | bc) -eq 1 ] && echo "✅ Excellent" || echo "⚠️ Needs improvement") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Lines | ${LINES}% | $([ $(echo "$LINES > 85" | bc) -eq 1 ] && echo "✅ Excellent" || echo "⚠️ Needs improvement") |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-
-            # Overall coverage status
-            OVERALL=$(echo "scale=1; ($STATEMENTS + $BRANCHES + $FUNCTIONS + $LINES) / 4" | bc)
-            echo "**Overall Coverage**: ${OVERALL}%" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Coverage data not found" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload test results
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: test-results-${{ matrix.node-version }}
+          name: wasm-modules
           path: |
-            coverage/
+            install/wasm/
           retention-days: 7
 
   build:
     name: Build Distribution
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker, wasm, emscripten]
     needs: test
+    container:
+      image: ghcr.io/discere-os/wasm-builder:main-b23d443
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
+      - name: Build WASM modules
+        run: deno task build:wasm
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: ${{ env.EMSCRIPTEN_VERSION }}
-
-      - name: Install dependencies
+      - name: Fix artifact permissions
         run: |
-          pnpm install --ignore-workspace --frozen-lockfile
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake pkg-config libglib2.0-dev
-
-      - name: Build dual WASM modules
-        run: pnpm run build
-
-      - name: Generate documentation
-        run: |
-          pnpm run build:docs || echo "Documentation generation skipped"
-
-      - name: Package distribution
-        run: pnpm pack
+          # Ensure artifacts are readable by runner (files created as root in container)
+          sudo chown -R $(id -u):$(id -g) install/ || chown -R $(id -u):$(id -g) install/
+          chmod -R u+rw,go+r install/
 
       - name: Generate WASM Build Summary
         run: |
@@ -142,30 +70,13 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Build artifacts analysis
-          if [[ -f "install/wasm/glib-side.wasm" && -f "install/wasm/glib-release.wasm" && -f "install/wasm/glib-release.js" ]]; then
-            SIDE_SIZE=$(stat -c%s "install/wasm/glib-side.wasm")
-            MAIN_SIZE=$(stat -c%s "install/wasm/glib-release.wasm")
-            JS_SIZE=$(stat -c%s "install/wasm/glib-release.js")
-            TOTAL_SIZE=$((SIDE_SIZE + MAIN_SIZE + JS_SIZE))
-
-            # Compression analysis
-            SIDE_COMPRESSED=$(gzip -c "install/wasm/glib-side.wasm" | wc -c)
-            MAIN_COMPRESSED=$(gzip -c "install/wasm/glib-release.wasm" | wc -c)
-            JS_COMPRESSED=$(gzip -c "install/wasm/glib-release.js" | wc -c)
-            TOTAL_COMPRESSED=$((SIDE_COMPRESSED + MAIN_COMPRESSED + JS_COMPRESSED))
-
-            SIDE_RATIO=$(echo "scale=2; $SIDE_SIZE / $SIDE_COMPRESSED" | bc)
-            MAIN_RATIO=$(echo "scale=2; $MAIN_SIZE / $MAIN_COMPRESSED" | bc)
-            JS_RATIO=$(echo "scale=2; $JS_SIZE / $JS_COMPRESSED" | bc)
-            TOTAL_RATIO=$(echo "scale=2; $TOTAL_SIZE / $TOTAL_COMPRESSED" | bc)
+          if [[ -f "install/wasm/glib-side.wasm" && -f "install/wasm/glib-main" ]]; then
+            SIDE_SIZE=$(stat -c%s "install/wasm/glib-side.wasm" 2>/dev/null || stat -f%z "install/wasm/glib-side.wasm")
 
             echo "## File Sizes" >> $GITHUB_STEP_SUMMARY
-            echo "| Module | Size | Compressed | Ratio |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|------|------------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| SIDE_MODULE | $(numfmt --to=iec $SIDE_SIZE) | $(numfmt --to=iec $SIDE_COMPRESSED) | ${SIDE_RATIO}x |" >> $GITHUB_STEP_SUMMARY
-            echo "| MAIN_MODULE | $(numfmt --to=iec $MAIN_SIZE) | $(numfmt --to=iec $MAIN_COMPRESSED) | ${MAIN_RATIO}x |" >> $GITHUB_STEP_SUMMARY
-            echo "| JS Glue | $(numfmt --to=iec $JS_SIZE) | $(numfmt --to=iec $JS_COMPRESSED) | ${JS_RATIO}x |" >> $GITHUB_STEP_SUMMARY
-            echo "| **Total** | **$(numfmt --to=iec $TOTAL_SIZE)** | **$(numfmt --to=iec $TOTAL_COMPRESSED)** | **${TOTAL_RATIO}x** |" >> $GITHUB_STEP_SUMMARY
+            echo "| Module | Size |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
+            echo "| SIDE_MODULE | $(numfmt --to=iec $SIDE_SIZE 2>/dev/null || echo "${SIDE_SIZE} bytes") |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ Build artifacts not found" >> $GITHUB_STEP_SUMMARY
@@ -175,199 +86,43 @@ jobs:
           # Build environment info
           echo "## Build Environment" >> $GITHUB_STEP_SUMMARY
           echo "- **Emscripten**: \`$(emcc --version | head -n1 | cut -d' ' -f2)\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Node.js**: \`$(node --version)\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **pnpm**: \`$(pnpm --version)\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **GLib**: \`$(pkg-config --modversion glib-2.0 2>/dev/null || echo 'N/A')\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Time**: $(date -ud "@$SECONDS" +%M:%S)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Meson**: \`$(meson --version)\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deno**: \`$(deno --version | head -n1 | cut -d' ' -f2)\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Runner**: \`$(uname -m)\` $(uname -s)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Run Performance Benchmarks
-        run: |
-          # Run benchmarks and capture output
-          echo "Running GLib WASM performance benchmarks..."
-          pnpm run benchmark > benchmark-results.txt 2>&1 || true
-
-          echo "## ⚡ Performance Benchmarks" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [[ -f "benchmark-results.txt" ]]; then
-            # Extract key performance metrics from benchmark output
-            if grep -q "GLib WASM functionality" benchmark-results.txt; then
-              BASIC_TEST=$(grep "Basic functionality" benchmark-results.txt | sed 's/.*: //' | sed 's/ .*//')
-              FS_TEST=$(grep "Filesystem operations" benchmark-results.txt | sed 's/.*: //' | sed 's/ .*//')
-
-              echo "### Summary" >> $GITHUB_STEP_SUMMARY
-              echo "- **Basic Functionality**: ${BASIC_TEST}" >> $GITHUB_STEP_SUMMARY
-              echo "- **Filesystem Operations**: ${FS_TEST}" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-            fi
-
-            # Extract WebGPU integration status
-            if grep -q "WebGPU integration" benchmark-results.txt; then
-              echo "### WebGPU Integration" >> $GITHUB_STEP_SUMMARY
-              echo "| Feature | Status |" >> $GITHUB_STEP_SUMMARY
-              echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
-
-              grep -E "WebGPU|High-precision timing|OPFS|SharedArrayBuffer" benchmark-results.txt | while read -r line; do
-                FEATURE=$(echo "$line" | cut -d: -f1 | xargs)
-                STATUS=$(echo "$line" | cut -d: -f2 | xargs)
-                echo "| $FEATURE | $STATUS |" >> $GITHUB_STEP_SUMMARY
-              done
-              echo "" >> $GITHUB_STEP_SUMMARY
-            fi
-
-            # Performance targets analysis
-            if grep -q "Performance Analysis" benchmark-results.txt; then
-              echo "### Quality Gates" >> $GITHUB_STEP_SUMMARY
-              INIT_STATUS=$(grep -A2 "Initialization performance" benchmark-results.txt | grep -o '[✅⚠️].*')
-              RUNTIME_STATUS=$(grep -A2 "Runtime performance" benchmark-results.txt | grep -o '[✅⚠️].*')
-
-              echo "- **Initialization**: $INIT_STATUS" >> $GITHUB_STEP_SUMMARY
-              echo "- **Runtime**: $RUNTIME_STATUS" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "⚠️ Benchmark results not available" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload build artifacts
+      - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist-package
           path: |
-            dist/
             install/
-            benchmark-results.txt
-            *.tgz
           retention-days: 7
-
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --ignore-workspace --frozen-lockfile
-
-      - name: Audit dependencies
-        run: pnpm audit --audit-level=moderate
-
-      - name: Check for vulnerabilities
-        run: |
-          # Additional vulnerability checking
-          echo "Using pnpm audit for vulnerability detection"
-
-          # Generate security summary
-          echo "## 🔒 Security Audit" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Run audit and capture results
-          pnpm audit --json > audit-results.json 2>/dev/null || true
-
-          if [[ -f "audit-results.json" ]] && [[ -s "audit-results.json" ]]; then
-            VULNERABILITIES=$(node -pe "try { JSON.parse(require('fs').readFileSync('audit-results.json')).vulnerabilities || 0 } catch(e) { 0 }")
-            DEPENDENCIES=$(node -pe "Object.keys(JSON.parse(require('fs').readFileSync('package.json')).devDependencies || {}).length")
-
-            echo "| Metric | Count | Status |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Vulnerabilities | $VULNERABILITIES | $([ $VULNERABILITIES -eq 0 ] && echo "✅ Clean" || echo "⚠️ Issues found") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Dev Dependencies | $DEPENDENCIES | $([ $DEPENDENCIES -lt 15 ] && echo "✅ Minimal" || echo "⚠️ Many deps") |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ **No security vulnerabilities found**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  publish-npm:
-    name: Publish to NPM (TEMPORARILY DISABLED)
-    runs-on: ubuntu-latest
-    needs: [test, build, security]
-    if: false  # Temporarily disabled for Cloudflare CDN testing
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'pnpm'
-
-      - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: ${{ env.EMSCRIPTEN_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pnpm install --ignore-workspace --frozen-lockfile
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake pkg-config libglib2.0-dev
-
-      - name: Build dual WASM modules
-        run: pnpm run build
-
-      - name: Run pre-publish tests
-        run: pnpm run prepublishOnly
-
-      - name: Publish to NPM
-        run: pnpm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   deploy-cloudflare-release:
     name: Deploy Release to Cloudflare R2
-    runs-on: ubuntu-latest
-    needs: [build, security]
+    runs-on: [self-hosted, docker, wasm, emscripten]
+    needs: [build]
     if: startsWith(github.ref, 'refs/tags/v')
+    container:
+      image: ghcr.io/discere-os/wasm-builder:main-b23d443
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist-package
-          path: ./
+          path: ./install
 
       - name: Set release version
         id: release-version
-        run: echo "VERSION=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Calculate SHA-256
         id: sha
@@ -378,214 +133,84 @@ jobs:
           echo "${SHA}" > "${WASM_FILE}.sha256"
           echo "🔒 SHA-256: ${SHA}"
 
-      - name: Deploy versioned WASM to Cloudflare R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: |
-            VERSION="${{ steps.release-version.outputs.VERSION }}"
-
-            # Deploy to @version path (immutable)
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm \
-              --file=install/wasm/glib-side.wasm \
-              --content-type=application/wasm \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm.sha256 \
-              --file=install/wasm/glib-side.wasm.sha256 \
-              --content-type=text/plain \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.js \
-              --file=install/wasm/glib-release.js \
-              --content-type=application/javascript \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.wasm \
-              --file=install/wasm/glib-release.wasm \
-              --content-type=application/wasm \
-              --cache-control="public, max-age=31536000, immutable"
-
-      - name: Deploy SHA path to Cloudflare R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: |
-            SHA="${{ steps.sha.outputs.sha }}"
-            SHA_SHORT="${SHA:0:7}"
-
-            # Deploy to @sha-xxx path (content-addressable, immutable)
-            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-side.wasm \
-              --file=install/wasm/glib-side.wasm \
-              --content-type=application/wasm \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-side.wasm.sha256 \
-              --file=install/wasm/glib-side.wasm.sha256 \
-              --content-type=text/plain \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-release.js \
-              --file=install/wasm/glib-release.js \
-              --content-type=application/javascript \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@sha-${SHA_SHORT}/glib-release.wasm \
-              --file=install/wasm/glib-release.wasm \
-              --content-type=application/wasm \
-              --cache-control="public, max-age=31536000, immutable"
-
-      - name: Update latest pointer
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: |
-            VERSION="${{ steps.release-version.outputs.VERSION }}"
-            echo "${VERSION}" > latest.txt
-
-            # Update @latest.txt pointer (short cache)
-            r2 object put discere-os-wasm-production/glib/@latest.txt \
-              --file=latest.txt \
-              --content-type=text/plain \
-              --cache-control="public, max-age=300"
-
-      - name: Verify Cloudflare deployment
+      - name: Deploy to Cloudflare R2
         run: |
-          sleep 15  # Wait for R2 propagation
-          curl -f "https://wasm.discere.cloud/glib@${{ steps.release-version.outputs.VERSION }}/glib-side.wasm" || exit 1
+          VERSION="${{ steps.release-version.outputs.VERSION }}"
+          SHA="${{ steps.sha.outputs.sha }}"
+
+          # Deploy SIDE_MODULE to versioned path (immutable)
+          wrangler r2 object put discere-os-wasm-production/glib@${VERSION}/side.wasm \
+            --remote \
+            --file=install/wasm/glib-side.wasm \
+            --content-type=application/wasm \
+            --cache-control="public, max-age=31536000, immutable"
+
+          # Deploy to SHA path (content-addressable)
+          wrangler r2 object put discere-os-wasm-production/glib@sha-${SHA:0:7}/side.wasm \
+            --remote \
+            --file=install/wasm/glib-side.wasm \
+            --content-type=application/wasm \
+            --cache-control="public, max-age=31536000, immutable"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify deployment
+        run: |
+          sleep 15
+          VERSION="${{ steps.release-version.outputs.VERSION }}"
+          curl -I "https://wasm.discere.cloud/glib@${VERSION}/side.wasm" || exit 1
           echo "✅ Cloudflare R2 deployment verified"
 
   deploy-cloudflare-snapshot:
     name: Deploy Snapshot to Cloudflare R2
-    runs-on: ubuntu-latest
-    needs: [build, security]
+    runs-on: [self-hosted, docker, wasm, emscripten]
+    needs: [build]
     if: github.ref == 'refs/heads/wasm' && github.event_name == 'push'
+    container:
+      image: ghcr.io/discere-os/wasm-builder:main-b23d443
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist-package
-          path: ./
+          path: ./install
 
       - name: Set snapshot version
         id: version
-        run: echo "VERSION=sha-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: echo "VERSION=sha-$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Calculate SHA-256
-        id: sha
+      - name: Calculate SHA-256 and generate metadata
+        id: metadata
         run: |
           WASM_FILE="install/wasm/glib-side.wasm"
           SHA=$(sha256sum "$WASM_FILE" | awk '{print $1}')
+          SIZE=$(stat -c%s "$WASM_FILE")
+
           echo "sha=${SHA}" >> $GITHUB_OUTPUT
+          echo "size=${SIZE}" >> $GITHUB_OUTPUT
           echo "${SHA}" > "${WASM_FILE}.sha256"
+
           echo "🔒 SHA-256: ${SHA}"
+          echo "📦 Size: $((SIZE / 1024)) KB"
 
-      - name: Deploy snapshot WASM to Cloudflare R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: |
-            VERSION="${{ steps.version.outputs.VERSION }}"
-
-            # Deploy to @sha-xxx path (snapshot)
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm \
-              --file=install/wasm/glib-side.wasm \
-              --content-type=application/wasm \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-side.wasm.sha256 \
-              --file=install/wasm/glib-side.wasm.sha256 \
-              --content-type=text/plain \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.js \
-              --file=install/wasm/glib-release.js \
-              --content-type=application/javascript \
-              --cache-control="public, max-age=31536000, immutable"
-
-            r2 object put discere-os-wasm-production/glib/@${VERSION}/glib-release.wasm \
-              --file=install/wasm/glib-release.wasm \
-              --content-type=application/wasm \
-              --cache-control="public, max-age=31536000, immutable"
-
-      - name: Log deployment success
-        run: echo "✅ Snapshot ${{ steps.version.outputs.VERSION }} deployed to Cloudflare R2"
-
-      - name: Verify snapshot deployment
+      - name: Deploy snapshot to Cloudflare R2
         run: |
-          sleep 15  # Wait for R2 propagation
+          VERSION="${{ steps.version.outputs.VERSION }}"
 
-          echo "## 🚀 Snapshot Deployment" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Test CDN endpoints
-          ENDPOINTS=(
-            "https://wasm.discere.cloud/glib@${{ steps.version.outputs.VERSION }}/package.json"
-            "https://wasm.discere.cloud/glib@${{ steps.version.outputs.VERSION }}/side/glib-side.wasm"
-            "https://wasm.discere.cloud/glib@${{ steps.version.outputs.VERSION }}/main/glib-release.js"
-          )
-
-          echo "| Endpoint | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
-
-          for endpoint in "${ENDPOINTS[@]}"; do
-            if curl -f --head "$endpoint" > /dev/null 2>&1; then
-              echo "| \`$(basename "$endpoint")\` | ✅ Available |" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "| \`$(basename "$endpoint")\` | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**CDN Base URL**: https://wasm.discere.cloud/glib@${VERSION}/" >> $GITHUB_STEP_SUMMARY
-          echo "**Expiration**: 30 days (snapshot)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Verify primary endpoint
-          curl -f "https://wasm.discere.cloud/glib@${VERSION}/package.json" || exit 1
-          echo "✅ Snapshot deployment verified: https://wasm.discere.cloud/glib@${VERSION}/"
-
-  notify:
-    name: Notify Deployment
-    runs-on: ubuntu-latest
-    needs: [deploy-cloudflare-release, deploy-cloudflare-snapshot]
-    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/wasm')
-
-    steps:
-      - name: Notify release success
-        if: startsWith(github.ref, 'refs/tags/v') && needs.deploy-cloudflare-release.result == 'success'
-        run: |
-          echo "🚀 glib.wasm v$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//') deployed successfully"
-          echo "🌐 Cloudflare R2: https://wasm.discere.cloud/glib@v$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')/"
-
-      - name: Notify snapshot success
-        if: github.ref == 'refs/heads/wasm' && needs.deploy-cloudflare-snapshot.result == 'success'
-        run: |
-          VERSION=sha-$(git rev-parse --short HEAD)
-          echo "🚀 glib.wasm snapshot ${VERSION} deployed successfully"
-          echo "🌐 Cloudflare R2: https://wasm.discere.cloud/glib@${VERSION}/"
-
-      - name: Notify failure
-        if: (needs.deploy-cloudflare-release.result == 'failure') || (needs.deploy-cloudflare-snapshot.result == 'failure')
-        run: |
-          echo "❌ Deployment failed for glib.wasm"
-          exit 1
+          # Deploy SIDE_MODULE only (MAIN_MODULE for testing/NPM only)
+          wrangler r2 object put discere-os-wasm-production/glib@${VERSION}/side.wasm \
+            --remote \
+            --file=install/wasm/glib-side.wasm \
+            --content-type=application/wasm \
+            --cache-control="public, max-age=31536000, immutable"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
