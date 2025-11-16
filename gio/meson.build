@@ -623,6 +623,13 @@ if glib_build_shared
   gio_sources += files ('../glib/gtrace.c')
 endif
 
+# Add POSIX sockets proxy for Emscripten/WASM builds
+if host_system == 'emscripten'
+  gio_sources += files(
+    'gposixsocketsproxy.c',
+  )
+endif
+
 gio_sources += contenttype_sources
 gio_sources += gdbus_daemon_sources
 gio_sources += unix_sources

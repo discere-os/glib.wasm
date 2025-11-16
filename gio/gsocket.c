@@ -82,6 +82,36 @@
 #include "giowin32-afunix.h"
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include "gposixsocketsproxy.h"
+
+/* Global POSIX sockets proxy instance for WASM */
+static GPosixSocketsProxy *g_wasm_proxy = NULL;
+static GMutex g_wasm_proxy_mutex;
+
+static void
+ensure_wasm_proxy_initialized (void)
+{
+  g_mutex_lock (&g_wasm_proxy_mutex);
+
+  if (g_wasm_proxy == NULL)
+    {
+      const char *proxy_url = g_getenv ("POSIX_PROXY_URL");
+
+      if (proxy_url == NULL)
+        proxy_url = "wss://posix-proxy.discere.cloud/v1";
+
+      g_debug ("[GSocket] Initializing POSIX sockets proxy: %s", proxy_url);
+      g_wasm_proxy = g_posix_sockets_proxy_new (proxy_url);
+
+      if (g_wasm_proxy == NULL)
+        g_warning ("[GSocket] Failed to initialize POSIX sockets proxy");
+    }
+
+  g_mutex_unlock (&g_wasm_proxy_mutex);
+}
+#endif /* __EMSCRIPTEN__ */
+
 /**
  * GSocket:
  *
@@ -642,6 +672,32 @@ g_socket (gint     domain,
           GError **error)
 {
   int fd, errsv;
+
+#ifdef __EMSCRIPTEN__
+  /* Use POSIX sockets proxy for WASM builds */
+  ensure_wasm_proxy_initialized ();
+
+  if (g_wasm_proxy != NULL)
+    {
+      /* Remove SOCK_CLOEXEC and SOCK_NONBLOCK flags for proxy */
+      int proxy_type = type & ~(SOCK_CLOEXEC | SOCK_NONBLOCK);
+      fd = proxy_socket (g_wasm_proxy, domain, proxy_type, protocol);
+
+      if (fd < 0)
+        {
+          errsv = errno;
+          g_set_error (error, G_IO_ERROR, socket_io_error_from_errno (errsv),
+                       _("Unable to create socket via proxy: %s"), socket_strerror (errsv));
+          return -1;
+        }
+
+      g_debug ("[GSocket] Created socket via proxy: fd=%d", fd);
+      return fd;
+    }
+
+  /* Fall through to native socket if proxy unavailable */
+  g_warning ("[GSocket] POSIX proxy not available, attempting native socket (will likely fail in WASM)");
+#endif /* __EMSCRIPTEN__ */
 
 #if defined(SOCK_CLOEXEC) && defined(SOCK_NONBLOCK)
   fd = socket (domain, type | SOCK_CLOEXEC | SOCK_NONBLOCK, protocol);
@@ -3126,6 +3182,29 @@ g_socket_connect (GSocket         *socket,
     g_object_unref (socket->priv->remote_address);
   socket->priv->remote_address = g_object_ref (address);
 
+#ifdef __EMSCRIPTEN__
+  /* Use proxy for connect on WASM */
+  if (g_wasm_proxy != NULL)
+    {
+      int result = proxy_connect (g_wasm_proxy, socket->priv->fd, &buffer.sa,
+                                  g_socket_address_get_native_size (address));
+
+      if (result < 0)
+        {
+          int errsv = errno;
+          g_set_error_literal (error, G_IO_ERROR,
+                               socket_io_error_from_errno (errsv),
+                               socket_strerror (errsv));
+          return FALSE;
+        }
+
+      g_debug ("[GSocket] Connected via proxy: fd=%d", socket->priv->fd);
+      socket->priv->connected_read = TRUE;
+      socket->priv->connected_write = TRUE;
+      return TRUE;
+    }
+#endif /* __EMSCRIPTEN__ */
+
   while (1)
     {
       if (connect (socket->priv->fd, &buffer.sa,
@@ -3364,6 +3443,23 @@ g_socket_receive_with_timeout (GSocket       *socket,
 
   if (g_cancellable_set_error_if_cancelled (cancellable, error))
     return -1;
+
+#ifdef __EMSCRIPTEN__
+  /* Use proxy for recv on WASM */
+  if (g_wasm_proxy != NULL)
+    {
+      ret = proxy_recv (g_wasm_proxy, socket->priv->fd, buffer, size, 0);
+
+      if (ret < 0)
+        {
+          int errsv = errno;
+          socket_set_error_lazy (error, errsv, _("Error receiving data via proxy: %s"));
+          return -1;
+        }
+
+      return ret;
+    }
+#endif /* __EMSCRIPTEN__ */
 
   while (1)
     {
@@ -3705,6 +3801,24 @@ g_socket_send_with_timeout (GSocket       *socket,
 
   if (g_cancellable_set_error_if_cancelled (cancellable, error))
     return -1;
+
+#ifdef __EMSCRIPTEN__
+  /* Use proxy for send on WASM */
+  if (g_wasm_proxy != NULL)
+    {
+      ret = proxy_send (g_wasm_proxy, socket->priv->fd, buffer, size,
+                        G_SOCKET_DEFAULT_SEND_FLAGS);
+
+      if (ret < 0)
+        {
+          int errsv = errno;
+          socket_set_error_lazy (error, errsv, _("Error sending data via proxy: %s"));
+          return -1;
+        }
+
+      return ret;
+    }
+#endif /* __EMSCRIPTEN__ */
 
   while (1)
     {
