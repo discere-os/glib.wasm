@@ -51,44 +51,93 @@ if (caps->has_wasm_simd) {
 
 ### Prerequisites
 
-- Emscripten SDK (latest)
-- CMake 3.24+
-- Chrome/Edge 113+ for testing
+- Emscripten SDK (3.1.50+)
+- Meson (1.4.0+)
+- Ninja build system
+- Chrome/Edge 113+ for testing (WebGPU + SIMD required)
 
-### Compilation
+### Unified Meson Build System
+
+The library uses a unified Meson-based build system with three build types:
 
 ```bash
-# Build both variants
-./build-dual.sh all
+# Standard build (recommended): SIMD + threading, balanced optimization
+deno task build:wasm
 
-# SIDE_MODULE only
-./build-dual.sh side
+# Minimal build: Size-optimized, no SIMD/threading (~2MB)
+deno task build:minimal
 
-# MAIN_MODULE only
-./build-dual.sh main
+# WebGPU build: GPU-accelerated, SIMD, threading (~6MB)
+deno task build:webgpu
+
+# Clean build artifacts
+deno task clean
 ```
 
-### Configuration Options
+### Build Configuration Options
 
-```cmake
-option(BUILD_SIDE_MODULE "Build as SIDE_MODULE" ON)
-option(ENABLE_SIMD "Enable WASM SIMD optimizations" ON)
-option(ENABLE_THREADING "Enable SharedArrayBuffer threading" ON)
-option(ENABLE_OPFS "Enable OPFS filesystem" ON)
-option(ENABLE_BROWSER_MAINLOOP "Enable browser-native main loop" ON)
+Configure via `meson_options.txt`:
+
+- `wasm_build_type`: Build variant (`minimal`, `standard`, `webgpu`)
+- `wasm_simd`: Enable SIMD optimizations (3-5x speedup)
+- `wasm_threading`: Enable pthread support (10x faster threads)
+- `wasm_webgpu`: Enable WebGPU renderer (10x+ GPU acceleration)
+- `wasm_optimize`: Optimization strategy (`size`, `speed`, `balanced`)
+
+### Manual Build
+
+```bash
+# Configure with Meson
+PKG_CONFIG_PATH=../libffi.wasm/install/wasm/pkgconfig \
+meson setup build-standard \
+  --cross-file=scripts/emscripten.cross \
+  --prefix=$(pwd)/install \
+  --libdir=wasm --bindir=wasm \
+  -Dwasm_build_type=standard \
+  -Dwasm_simd=true \
+  -Dwasm_threading=true
+
+# Compile
+meson compile -C build-standard
+
+# Install
+meson install -C build-standard
 ```
 
 ## TypeScript Integration
 
 ```typescript
-import GLibWasm from '@discere-os/glib.wasm'
+import GLib from '@discere-os/glib.wasm'
 
-const glib = new GLibWasm()
+const glib = new GLib({
+  simdOptimizations: true,
+  threading: true,
+  maxMemoryMB: 128,
+})
 await glib.initialize()
 
-// Use standard GLib APIs
-const hash = glib.computeChecksum('sha256', data)
-const list = glib.listNew()
+// Check web capabilities
+const caps = await glib.getWebCapabilities()
+console.log('SIMD support:', caps.has_wasm_simd)
+console.log('WebGPU support:', caps.has_webgpu)
+
+// Use Web Crypto API integration
+const hash = await glib.computeChecksum('Test data', 'SHA256')
+const randomBytes = await glib.generateRandomBytes(32)
+
+// String processing with SIMD
+const result = await glib.processString('Hello, World!', {
+  uppercase: true,
+  trimWhitespace: true,
+  validateUTF8: true,
+})
+
+// Test GLib data structures
+await glib.testHashTable({ key1: 'value1', key2: 'value2' })
+await glib.testPtrArray(['item1', 'item2', 'item3'])
+
+// Cleanup
+glib.cleanup()
 ```
 
 ## Performance Characteristics
@@ -119,18 +168,38 @@ This implementation maintains 100% source and binary compatibility with upstream
 - Direct filesystem access outside OPFS
 - Network sockets (use Fetch API abstraction)
 
-## Testing
+## Testing and Validation
 
 ```bash
-# Deno-based test suite
+# Run all tests
 deno task test
 
-# Browser compatibility testing
-deno task test:browser
+# Run specific test suites
+deno task test:basic          # Basic functionality tests
+deno task test:performance    # Performance validation tests
+deno task test:threading      # Threading tests
+deno task test:gobject        # GObject tests
 
-# Performance benchmarks
-deno task bench
+# Run benchmarks
+deno task bench               # SIMD string operations benchmark
+deno task bench:simd          # SIMD-specific benchmarks
+deno task bench:glib          # GLib operations benchmark
+
+# Run full validation suite (tests + benchmarks)
+deno task validate:all
+
+# Run demo
+deno task demo
 ```
+
+### Performance Validation
+
+The test suite validates that web-native optimizations meet performance targets:
+
+- **SIMD strings**: ≥3x speedup, ≥100 MB/s throughput
+- **Web Crypto**: ≥5x speedup, ≥200 MB/s throughput
+- **Workers**: ≥10x faster thread creation
+- **Memory ops**: ≥100 MB/s throughput
 
 ## Installation
 

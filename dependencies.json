@@ -1,0 +1,34 @@
+{
+  "dependencies": [
+    {
+      "name": "wasm:libc",
+      "version": "*",
+      "type": "system",
+      "symbols": {
+        "required": [
+          "malloc",
+          "free",
+          "realloc",
+          "calloc",
+          "memcpy",
+          "memset",
+          "memmove",
+          "strcmp",
+          "strlen",
+          "strcpy",
+          "strncpy"
+        ]
+      },
+      "loading": "eager",
+      "fallback": null
+    },
+    {
+      "name": "libffi",
+      "version": "3.4.4",
+      "type": "side",
+      "url": "https://wasm.discere.cloud/libffi.wasm/v3.4.4/side/libffi-side.wasm",
+      "integrity": "sha384-PLACEHOLDER",
+      "optional": false
+    }
+  ]
+}
