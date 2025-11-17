@@ -26,6 +26,8 @@
     "test:basic": "deno test --allow-read --allow-write --no-check tests/deno/basic.test.ts",
     "test:threading": "deno test --allow-read --allow-write --no-check tests/deno/threading.test.ts",
     "test:gobject": "deno test --allow-read --allow-write --no-check tests/deno/gobject.test.ts",
+    "test:proxy": "POSIX_PROXY_URL=wss://posix-proxy.discere.cloud/v1 deno task test",
+    "test:proxy:local": "POSIX_PROXY_URL=ws://localhost:8080/v1 deno task test",
     "benchmark": "deno run --allow-read --allow-write bench/glib.bench.ts",
     "benchmark:threads": "deno run --allow-read --allow-write bench/threads.bench.ts",
     "benchmark:collections": "deno run --allow-read --allow-write bench/collections.bench.ts",
